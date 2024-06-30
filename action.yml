@@ -13,17 +13,19 @@ inputs:
     default: ${{ github.token }}
   days-inactive-issues:
     description: "Number of days of inactivity before locking issues"
-    default: 30
+    default: 90
     required: false
   days-inactive-prs:
     description: "Number of days of inactivity before locking PRs"
-    default: 30
+    default: 90
     required: false
   lock-reason-issues:
     description: "Reason for locking issues"
+    default: "resolved"
     required: false
   lock-reason-prs:
     description: "Reason for locking PRs"
+    default: "resolved"
     required: false
 
 runs:
