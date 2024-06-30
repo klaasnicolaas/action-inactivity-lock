@@ -1,0 +1,31 @@
+name: "Inactivity Lock"
+author: "Klaas Schoute <hello@student-techlife.com>"
+description: "Automatically locks inactive issues and pull requests after a period of inactivity"
+
+branding:
+  icon: "lock"
+  color: "purple"
+
+inputs:
+  repo-token:
+    description: "Token for the repository. Can be passed in using `{{ secrets.GITHUB_TOKEN }}`."
+    required: false
+    default: ${{ github.token }}
+  days-inactive-issues:
+    description: "Number of days of inactivity before locking issues"
+    default: 30
+    required: false
+  days-inactive-prs:
+    description: "Number of days of inactivity before locking PRs"
+    default: 30
+    required: false
+  lock-reason-issues:
+    description: "Reason for locking issues"
+    required: false
+  lock-reason-prs:
+    description: "Reason for locking PRs"
+    required: false
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
