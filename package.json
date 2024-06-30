@@ -7,6 +7,8 @@
   "author": "Klaas Schoute <hello@student-techlife.com>",
   "scripts": {
     "build": "tsc -p tsconfig.build.json && ncc build",
+    "format:check": "prettier --check src/**/*.ts",
+    "format:fix": "prettier --write src/**/*.ts",
     "typing:check": "tsc --noEmit",
     "test": "jest tests"
   },
@@ -54,6 +56,7 @@
     "@vercel/ncc": "^0.38.1",
     "babel-jest": "^29.7.0",
     "jest": "^29.7.0",
+    "prettier": "^3.3.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.2"
   }

@@ -38,11 +38,11 @@ const core = __importStar(__nccwpck_require__(2186));
 const github_1 = __nccwpck_require__(5438);
 async function run() {
     try {
-        const token = core.getInput("repo-token");
-        const daysInactiveIssues = parseInt(core.getInput("days-inactive-issues"), 10);
-        const daysInactivePRs = parseInt(core.getInput("days-inactive-prs"), 10);
-        const lockReasonIssues = core.getInput("lock-reason-issues");
-        const lockReasonPRs = core.getInput("lock-reason-prs");
+        const token = core.getInput('repo-token');
+        const daysInactiveIssues = parseInt(core.getInput('days-inactive-issues'), 10);
+        const daysInactivePRs = parseInt(core.getInput('days-inactive-prs'), 10);
+        const lockReasonIssues = core.getInput('lock-reason-issues');
+        const lockReasonPRs = core.getInput('lock-reason-prs');
         const octokit = (0, github_1.getOctokit)(token);
         const { owner, repo } = github_1.context.repo;
         const perPage = 100; // Batch size for processing
@@ -53,7 +53,7 @@ async function run() {
             await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage);
         }
         else {
-            core.warning("Initial rate limit exceeded, stopping processing.");
+            core.warning('Initial rate limit exceeded, stopping processing.');
         }
     }
     catch (error) {
@@ -72,7 +72,7 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
     const issues = await octokit.rest.issues.listForRepo({
         owner,
         repo,
-        state: "closed",
+        state: 'closed',
         per_page: perPage,
         page: page,
     });
@@ -109,7 +109,7 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
     const pullRequests = await octokit.rest.pulls.list({
         owner,
         repo,
-        state: "closed",
+        state: 'closed',
         per_page: perPage,
         page: page,
     });
