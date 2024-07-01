@@ -30,25 +30,27 @@ export async function run(): Promise<void> {
     const rateLimitStatus = await checkRateLimit(octokit)
     if (rateLimitStatus.remaining > rateLimitBuffer) {
       core.info('Sufficient rate limit available, starting processing.')
-      // Process issues and PRs
-      await processIssues(
-        octokit,
-        owner,
-        repo,
-        daysInactiveIssues,
-        lockReasonIssues,
-        perPage,
-        rateLimitBuffer,
-      )
-      await processPullRequests(
-        octokit,
-        owner,
-        repo,
-        daysInactivePRs,
-        lockReasonPRs,
-        perPage,
-        rateLimitBuffer,
-      )
+      // Process issues and PRs in parallel
+      await Promise.all([
+        processIssues(
+          octokit,
+          owner,
+          repo,
+          daysInactiveIssues,
+          lockReasonIssues,
+          perPage,
+          rateLimitBuffer,
+        ),
+        processPullRequests(
+          octokit,
+          owner,
+          repo,
+          daysInactivePRs,
+          lockReasonPRs,
+          perPage,
+          rateLimitBuffer,
+        ),
+      ])
     } else {
       core.warning('Initial rate limit too low, stopping processing.')
     }
@@ -84,57 +86,61 @@ export async function processIssues(
     return
   }
 
-  const issues = await octokit.rest.issues.listForRepo({
-    owner,
-    repo,
-    state: 'closed',
-    per_page: perPage,
-    page: page,
-  })
+  try {
+    const issues = await octokit.rest.issues.listForRepo({
+      owner,
+      repo,
+      state: 'closed',
+      per_page: perPage,
+      page: page,
+    })
 
-  // No more issues to process
-  if (issues.data.length === 0) {
-    core.info(`No more issues to process.`)
-    return
-  }
+    // No more issues to process
+    if (issues.data.length === 0) {
+      core.info(`No more issues to process.`)
+      return
+    }
 
-  for (const issue of issues.data) {
-    // Check if it's not a PR
-    if (!issue.pull_request) {
-      const lastUpdated = new Date(issue.updated_at)
-      const daysDifference =
-        (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
+    for (const issue of issues.data) {
+      // Check if it's not a PR
+      if (!issue.pull_request) {
+        const lastUpdated = new Date(issue.updated_at)
+        const daysDifference =
+          (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
 
-      if (daysDifference > daysInactiveIssues) {
-        // Lock the issue
-        await octokit.rest.issues.lock({
-          owner,
-          repo,
-          issue_number: issue.number,
-          lock_reason: lockReasonIssues,
-        })
-        core.info(
-          `Locked issue #${issue.number} due to ${daysInactiveIssues} days of inactivity.`,
-        )
-      } else {
-        core.debug(
-          `Issue #${issue.number} has only ${daysDifference} days of inactivity.`,
-        )
+        if (daysDifference > daysInactiveIssues) {
+          // Lock the issue
+          await octokit.rest.issues.lock({
+            owner,
+            repo,
+            issue_number: issue.number,
+            lock_reason: lockReasonIssues,
+          })
+          core.info(
+            `Locked issue #${issue.number} due to ${daysInactiveIssues} days of inactivity.`,
+          )
+        } else {
+          core.debug(
+            `Issue #${issue.number} has only ${daysDifference} days of inactivity.`,
+          )
+        }
       }
     }
-  }
 
-  // Process next batch
-  await processIssues(
-    octokit,
-    owner,
-    repo,
-    daysInactiveIssues,
-    lockReasonIssues,
-    perPage,
-    rateLimitBuffer,
-    page + 1,
-  )
+    // Process next batch
+    await processIssues(
+      octokit,
+      owner,
+      repo,
+      daysInactiveIssues,
+      lockReasonIssues,
+      perPage,
+      rateLimitBuffer,
+      page + 1,
+    )
+  } catch (error) {
+    core.setFailed(`Failed to process issues: ${error}`)
+  }
 }
 
 export async function processPullRequests(
@@ -159,54 +165,58 @@ export async function processPullRequests(
     return
   }
 
-  const pullRequests = await octokit.rest.pulls.list({
-    owner,
-    repo,
-    state: 'closed',
-    per_page: perPage,
-    page: page,
-  })
+  try {
+    const pullRequests = await octokit.rest.pulls.list({
+      owner,
+      repo,
+      state: 'closed',
+      per_page: perPage,
+      page: page,
+    })
 
-  // No more PRs to process
-  if (pullRequests.data.length === 0) {
-    core.info(`No more PRs to process.`)
-    return
-  }
-
-  for (const pr of pullRequests.data) {
-    const lastUpdated = new Date(pr.updated_at)
-    const daysDifference =
-      (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
-
-    if (daysDifference > daysInactivePRs) {
-      // Lock the PR
-      await octokit.rest.issues.lock({
-        owner,
-        repo,
-        issue_number: pr.number,
-        lock_reason: lockReasonPRs,
-      })
-      core.info(
-        `Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`,
-      )
-    } else {
-      core.debug(
-        `PR #${pr.number} has only ${daysDifference} days of inactivity.`,
-      )
+    // No more PRs to process
+    if (pullRequests.data.length === 0) {
+      core.info(`No more PRs to process.`)
+      return
     }
-  }
 
-  // Process next batch
-  await processPullRequests(
-    octokit,
-    owner,
-    repo,
-    daysInactivePRs,
-    lockReasonPRs,
-    perPage,
-    rateLimitBuffer,
-    page + 1,
-  )
+    for (const pr of pullRequests.data) {
+      const lastUpdated = new Date(pr.updated_at)
+      const daysDifference =
+        (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
+
+      if (daysDifference > daysInactivePRs) {
+        // Lock the PR
+        await octokit.rest.issues.lock({
+          owner,
+          repo,
+          issue_number: pr.number,
+          lock_reason: lockReasonPRs,
+        })
+        core.info(
+          `Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`,
+        )
+      } else {
+        core.debug(
+          `PR #${pr.number} has only ${daysDifference} days of inactivity.`,
+        )
+      }
+    }
+
+    // Process next batch
+    await processPullRequests(
+      octokit,
+      owner,
+      repo,
+      daysInactivePRs,
+      lockReasonPRs,
+      perPage,
+      rateLimitBuffer,
+      page + 1,
+    )
+  } catch (error) {
+    core.setFailed(`Failed to process pull requests: ${error}`)
+  }
 }
 
 export async function checkRateLimit(octokit: ReturnType<typeof getOctokit>) {
