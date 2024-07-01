@@ -90,6 +90,15 @@ describe('GitHub Action - Rate Limit Handling', () => {
     expect(rateLimitStatus.resetTime).toEqual(
       expectedReset - Math.floor(Date.now() / 1000),
     )
+    expect(rateLimitStatus.resetTimeHumanReadable).toEqual(
+      new Date(expectedReset * 1000).toLocaleString(),
+    )
+    expect(core.info).toHaveBeenCalledWith(
+      `Rate limit remaining: ${expectedRemaining}`,
+    )
+    expect(core.info).toHaveBeenCalledWith(
+      `Rate limit resets at: ${new Date(expectedReset * 1000).toLocaleString()}`,
+    )
   })
 
   it('should warn and stop processing if initial rate limit is exceeded', async () => {

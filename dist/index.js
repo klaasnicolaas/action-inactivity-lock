@@ -165,10 +165,11 @@ async function checkRateLimit(octokit) {
     const remaining = rateLimit.data.resources.core.remaining;
     const reset = rateLimit.data.resources.core.reset;
     const now = Math.floor(Date.now() / 1000);
-    const resetTime = reset - now;
+    const resetTimeInSeconds = reset - now;
+    const resetTimeHumanReadable = new Date(reset * 1000).toLocaleString();
     core.info(`Rate limit remaining: ${remaining}`);
-    core.info(`Rate limit resets in: ${resetTime} seconds`);
-    return { remaining, resetTime };
+    core.info(`Rate limit resets at: ${resetTimeHumanReadable}`);
+    return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable };
 }
 run();
 
