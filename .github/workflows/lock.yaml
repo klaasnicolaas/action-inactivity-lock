@@ -23,6 +23,6 @@ jobs:
       - uses: ./
         with:
           days-inactive-issues: 30
-          days-inactive-prs: 30
+          days-inactive-prs: 1
           lock-reason-issues: ""
           lock-reason-prs: ""
