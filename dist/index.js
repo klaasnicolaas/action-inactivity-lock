@@ -39,6 +39,7 @@ const github_1 = __nccwpck_require__(5438);
 async function run() {
     try {
         const token = core.getInput('repo-token');
+        const rateLimitBuffer = parseInt(core.getInput('rate-limit-buffer'), 10);
         const daysInactiveIssues = parseInt(core.getInput('days-inactive-issues'), 10);
         const daysInactivePRs = parseInt(core.getInput('days-inactive-prs'), 10);
         const lockReasonIssues = core.getInput('lock-reason-issues');
@@ -47,13 +48,14 @@ async function run() {
         const { owner, repo } = github_1.context.repo;
         const perPage = 100; // Batch size for processing
         const rateLimitStatus = await checkRateLimit(octokit);
-        if (rateLimitStatus.remaining > 0) {
+        if (rateLimitStatus.remaining > rateLimitBuffer) {
+            core.info('Sufficient rate limit available, starting processing.');
             // Process issues and PRs
-            await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage);
-            await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage);
+            await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer);
+            await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer);
         }
         else {
-            core.warning('Initial rate limit exceeded, stopping processing.');
+            core.warning('Initial rate limit too low, stopping processing.');
         }
     }
     catch (error) {
@@ -61,11 +63,12 @@ async function run() {
             core.setFailed(error.message);
     }
 }
-async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, page = 1) {
+async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, page = 1) {
     const now = new Date();
+    core.info(`Processing issues - page ${page} for ${owner}/${repo}.`);
     // Check rate limit before processing
     const rateLimitStatus = await checkRateLimit(octokit);
-    if (rateLimitStatus.remaining <= 0) {
+    if (rateLimitStatus.remaining <= rateLimitBuffer) {
         core.warning(`Rate limit exceeded, stopping further processing. Please wait for ${rateLimitStatus.resetTime} seconds before continuing.`);
         return;
     }
@@ -76,8 +79,11 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
         per_page: perPage,
         page: page,
     });
-    if (issues.data.length === 0)
-        return; // No more issues to process
+    // No more issues to process
+    if (issues.data.length === 0) {
+        core.info(`No more issues to process.`);
+        return;
+    }
     for (const issue of issues.data) {
         // Check if it's not a PR
         if (!issue.pull_request) {
@@ -93,16 +99,20 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
                 });
                 core.info(`Locked issue #${issue.number} due to ${daysInactiveIssues} days of inactivity.`);
             }
+            else {
+                core.debug(`Issue #${issue.number} has only ${daysDifference} days of inactivity.`);
+            }
         }
     }
     // Process next batch
-    await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, page + 1);
+    await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, page + 1);
 }
-async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, page = 1) {
+async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, page = 1) {
     const now = new Date();
+    core.info(`Processing pull requests - page ${page} for ${owner}/${repo}.`);
     // Check rate limit before processing
     const rateLimitStatus = await checkRateLimit(octokit);
-    if (rateLimitStatus.remaining <= 0) {
+    if (rateLimitStatus.remaining <= rateLimitBuffer) {
         core.warning(`Rate limit exceeded, stopping further processing. Please wait for ${rateLimitStatus.resetTime} seconds before continuing.`);
         return;
     }
@@ -113,8 +123,11 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
         per_page: perPage,
         page: page,
     });
-    if (pullRequests.data.length === 0)
-        return; // No more PRs to process
+    // No more PRs to process
+    if (pullRequests.data.length === 0) {
+        core.info(`No more PRs to process.`);
+        return;
+    }
     for (const pr of pullRequests.data) {
         const lastUpdated = new Date(pr.updated_at);
         const daysDifference = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
@@ -128,9 +141,12 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
             });
             core.info(`Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`);
         }
+        else {
+            core.debug(`PR #${pr.number} has only ${daysDifference} days of inactivity.`);
+        }
     }
     // Process next batch
-    await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, page + 1);
+    await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, page + 1);
 }
 async function checkRateLimit(octokit) {
     const rateLimit = await octokit.rest.rateLimit.get();

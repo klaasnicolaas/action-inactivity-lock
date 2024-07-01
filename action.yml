@@ -11,6 +11,10 @@ inputs:
     description: "Token for the repository. Can be passed in using `{{ secrets.GITHUB_TOKEN }}`."
     required: false
     default: ${{ github.token }}
+  rate-limit-buffer:
+    description: "Buffer to avoid hitting the rate limit"
+    default: 100
+    required: false
   days-inactive-issues:
     description: "Number of days of inactivity before locking issues"
     default: 90
