@@ -70,6 +70,7 @@ describe('GitHub Action - Lock PRs', () => {
             data: [
               {
                 number: 1,
+                title: 'Test PR',
                 updated_at: '2023-05-29T12:00:00Z', // Assuming this issue is inactive
               },
             ],
@@ -84,6 +85,7 @@ describe('GitHub Action - Lock PRs', () => {
 
     // @ts-ignore - Ignore missing properties
     const mockLock = jest.fn().mockResolvedValue({})
+    const lockedPRs: { number: number; title: string }[] = []
     mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
 
     await processPullRequests(
@@ -94,10 +96,7 @@ describe('GitHub Action - Lock PRs', () => {
       'off-topic',
       100,
       100,
-    )
-
-    expect(mockCore.info).toHaveBeenCalledWith(
-      'Processing pull requests - page 1 for test-owner/test-repo.',
+      lockedPRs,
     )
 
     expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
@@ -114,6 +113,19 @@ describe('GitHub Action - Lock PRs', () => {
       issue_number: 1,
       lock_reason: 'off-topic',
     })
+
+    expect(mockCore.info).toHaveBeenCalledWith(
+      'Locked PR #1 due to 30 days of inactivity.',
+    )
+
+    // Ensure lockedPRs array is updated correctly
+    expect(lockedPRs).toEqual([{ number: 1, title: 'Test PR' }])
+
+    // Ensure outputs are set correctly
+    expect(mockCore.setOutput).toHaveBeenCalledWith(
+      'locked-prs',
+      JSON.stringify([{ number: 1, title: 'Test PR' }]),
+    )
   })
 
   it('should not lock PRs that are less than 30 days inactive', async () => {

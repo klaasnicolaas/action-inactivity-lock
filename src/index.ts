@@ -27,6 +27,8 @@ export async function run(): Promise<void> {
     const { owner, repo } = context.repo
     const perPage = 100 // Batch size for processing
 
+    core.info('Starting processing of issues and pull requests.')
+
     const rateLimitStatus = await checkRateLimit(octokit)
     if (rateLimitStatus.remaining > rateLimitBuffer) {
       core.info('Sufficient rate limit available, starting processing.')
@@ -72,16 +74,16 @@ export async function processIssues(
     | undefined,
   perPage: number,
   rateLimitBuffer: number,
+  lockedIssues: { number: number; title: string }[] = [],
   page: number = 1,
 ): Promise<void> {
   const now = new Date()
-  core.info(`Processing issues - page ${page} for ${owner}/${repo}.`)
 
   // Check rate limit before processing
   const rateLimitStatus = await checkRateLimit(octokit)
   if (rateLimitStatus.remaining <= rateLimitBuffer) {
     core.warning(
-      `Rate limit exceeded, stopping further processing. Please wait for ${rateLimitStatus.resetTime} seconds before continuing.`,
+      `Rate limit exceeded, stopping further processing. Please wait until ${rateLimitStatus.resetTimeHumanReadable}.`,
     )
     return
   }
@@ -98,6 +100,8 @@ export async function processIssues(
     // No more issues to process
     if (issues.data.length === 0) {
       core.info(`No more issues to process.`)
+      // Set the output for locked issues
+      core.setOutput('locked-issues', JSON.stringify(lockedIssues))
       return
     }
 
@@ -119,6 +123,8 @@ export async function processIssues(
           core.info(
             `Locked issue #${issue.number} due to ${daysInactiveIssues} days of inactivity.`,
           )
+          // Add the locked issue to the list
+          lockedIssues.push({ number: issue.number, title: issue.title })
         } else {
           core.debug(
             `Issue #${issue.number} has only ${daysDifference} days of inactivity.`,
@@ -136,6 +142,7 @@ export async function processIssues(
       lockReasonIssues,
       perPage,
       rateLimitBuffer,
+      lockedIssues,
       page + 1,
     )
   } catch (error) {
@@ -151,16 +158,16 @@ export async function processPullRequests(
   lockReasonPRs: 'off-topic' | 'too heated' | 'resolved' | 'spam' | undefined,
   perPage: number,
   rateLimitBuffer: number,
+  lockedPRs: { number: number; title: string }[] = [],
   page: number = 1,
 ): Promise<void> {
   const now = new Date()
-  core.info(`Processing pull requests - page ${page} for ${owner}/${repo}.`)
 
   // Check rate limit before processing
   const rateLimitStatus = await checkRateLimit(octokit)
   if (rateLimitStatus.remaining <= rateLimitBuffer) {
     core.warning(
-      `Rate limit exceeded, stopping further processing. Please wait for ${rateLimitStatus.resetTime} seconds before continuing.`,
+      `Rate limit exceeded, stopping further processing. Please wait until ${rateLimitStatus.resetTimeHumanReadable}`,
     )
     return
   }
@@ -177,6 +184,8 @@ export async function processPullRequests(
     // No more PRs to process
     if (pullRequests.data.length === 0) {
       core.info(`No more PRs to process.`)
+      // Set the output for locked PRs
+      core.setOutput('locked-prs', JSON.stringify(lockedPRs))
       return
     }
 
@@ -196,6 +205,8 @@ export async function processPullRequests(
         core.info(
           `Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`,
         )
+        // Add the locked PR to the list
+        lockedPRs.push({ number: pr.number, title: pr.title })
       } else {
         core.debug(
           `PR #${pr.number} has only ${daysDifference} days of inactivity.`,
@@ -212,6 +223,7 @@ export async function processPullRequests(
       lockReasonPRs,
       perPage,
       rateLimitBuffer,
+      lockedPRs,
       page + 1,
     )
   } catch (error) {
