@@ -47,6 +47,7 @@ async function run() {
         const octokit = (0, github_1.getOctokit)(token);
         const { owner, repo } = github_1.context.repo;
         const perPage = 100; // Batch size for processing
+        core.info('Starting processing of issues and pull requests.');
         const rateLimitStatus = await checkRateLimit(octokit);
         if (rateLimitStatus.remaining > rateLimitBuffer) {
             core.info('Sufficient rate limit available, starting processing.');
@@ -65,13 +66,12 @@ async function run() {
             core.setFailed(error.message);
     }
 }
-async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, page = 1) {
+async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, lockedIssues = [], page = 1) {
     const now = new Date();
-    core.info(`Processing issues - page ${page} for ${owner}/${repo}.`);
     // Check rate limit before processing
     const rateLimitStatus = await checkRateLimit(octokit);
     if (rateLimitStatus.remaining <= rateLimitBuffer) {
-        core.warning(`Rate limit exceeded, stopping further processing. Please wait for ${rateLimitStatus.resetTime} seconds before continuing.`);
+        core.warning(`Rate limit exceeded, stopping further processing. Please wait until ${rateLimitStatus.resetTimeHumanReadable}.`);
         return;
     }
     try {
@@ -85,6 +85,8 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
         // No more issues to process
         if (issues.data.length === 0) {
             core.info(`No more issues to process.`);
+            // Set the output for locked issues
+            core.setOutput('locked-issues', JSON.stringify(lockedIssues));
             return;
         }
         for (const issue of issues.data) {
@@ -101,6 +103,8 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
                         lock_reason: lockReasonIssues,
                     });
                     core.info(`Locked issue #${issue.number} due to ${daysInactiveIssues} days of inactivity.`);
+                    // Add the locked issue to the list
+                    lockedIssues.push({ number: issue.number, title: issue.title });
                 }
                 else {
                     core.debug(`Issue #${issue.number} has only ${daysDifference} days of inactivity.`);
@@ -108,19 +112,18 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
             }
         }
         // Process next batch
-        await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, page + 1);
+        await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, lockedIssues, page + 1);
     }
     catch (error) {
         core.setFailed(`Failed to process issues: ${error}`);
     }
 }
-async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, page = 1) {
+async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, lockedPRs = [], page = 1) {
     const now = new Date();
-    core.info(`Processing pull requests - page ${page} for ${owner}/${repo}.`);
     // Check rate limit before processing
     const rateLimitStatus = await checkRateLimit(octokit);
     if (rateLimitStatus.remaining <= rateLimitBuffer) {
-        core.warning(`Rate limit exceeded, stopping further processing. Please wait for ${rateLimitStatus.resetTime} seconds before continuing.`);
+        core.warning(`Rate limit exceeded, stopping further processing. Please wait until ${rateLimitStatus.resetTimeHumanReadable}`);
         return;
     }
     try {
@@ -134,6 +137,8 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
         // No more PRs to process
         if (pullRequests.data.length === 0) {
             core.info(`No more PRs to process.`);
+            // Set the output for locked PRs
+            core.setOutput('locked-prs', JSON.stringify(lockedPRs));
             return;
         }
         for (const pr of pullRequests.data) {
@@ -148,13 +153,15 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
                     lock_reason: lockReasonPRs,
                 });
                 core.info(`Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`);
+                // Add the locked PR to the list
+                lockedPRs.push({ number: pr.number, title: pr.title });
             }
             else {
                 core.debug(`PR #${pr.number} has only ${daysDifference} days of inactivity.`);
             }
         }
         // Process next batch
-        await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, page + 1);
+        await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, lockedPRs, page + 1);
     }
     catch (error) {
         core.setFailed(`Failed to process pull requests: ${error}`);

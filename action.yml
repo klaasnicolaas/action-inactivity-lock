@@ -31,6 +31,11 @@ inputs:
     description: "Reason for locking PRs"
     default: "resolved"
     required: false
+outputs:
+  locked-issues:
+    description: "JSON array of locked issues"
+  locked-prs:
+    description: "JSON array of locked PRs"
 
 runs:
   using: "node20"

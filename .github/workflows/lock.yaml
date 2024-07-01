@@ -7,6 +7,10 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lock:
     name: 🔒 Lock closed issues and PRs
@@ -20,9 +24,14 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: ./
+      - name: 🚀 Lock inactive issues and PRs
+        uses: ./
         with:
           days-inactive-issues: 30
           days-inactive-prs: 1
           lock-reason-issues: ""
           lock-reason-prs: ""
+      - name: 🔍 Display locked issues and PRs
+        run: |
+          echo "Locked issues: ${{ steps.lock.outputs.locked-issues }}"
+          echo "Locked PRs: ${{ steps.lock.outputs.locked-prsd }}"
