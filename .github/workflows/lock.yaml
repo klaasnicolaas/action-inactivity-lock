@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   lock:
-    name: 🔒 Lock closed issues and PRs
+    name: Lock issues and PRs
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -24,7 +24,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: 🚀 Lock inactive issues and PRs
+      - name: 🔒 Lock closed issues and PRs
         uses: ./
         with:
           days-inactive-issues: 30
