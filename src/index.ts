@@ -223,13 +223,15 @@ export async function checkRateLimit(octokit: ReturnType<typeof getOctokit>) {
   const rateLimit = await octokit.rest.rateLimit.get()
   const remaining = rateLimit.data.resources.core.remaining
   const reset = rateLimit.data.resources.core.reset
+
   const now = Math.floor(Date.now() / 1000)
-  const resetTime = reset - now
+  const resetTimeInSeconds = reset - now
+  const resetTimeHumanReadable = new Date(reset * 1000).toLocaleString()
 
   core.info(`Rate limit remaining: ${remaining}`)
-  core.info(`Rate limit resets in: ${resetTime} seconds`)
+  core.info(`Rate limit resets at: ${resetTimeHumanReadable}`)
 
-  return { remaining, resetTime }
+  return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable }
 }
 
 run()
