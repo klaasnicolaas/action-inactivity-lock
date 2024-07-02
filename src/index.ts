@@ -34,6 +34,7 @@ export async function run(): Promise<void> {
     const perPage = 100 // Batch size for processing
 
     core.info('Starting processing of issues and pull requests.')
+    core.info('Checking rate limit before processing.')
 
     const rateLimitStatus = (await checkRateLimit(octokit)) as RateLimitStatus
     if (rateLimitStatus.remaining > rateLimitBuffer) {
@@ -86,6 +87,7 @@ export async function processIssues(
   page: number = 1,
 ): Promise<void> {
   const now = new Date()
+  core.info(`Processing issues on page ${page}`)
 
   // Check rate limit before processing
   const rateLimitStatus = await checkRateLimit(octokit)
@@ -121,13 +123,18 @@ export async function processIssues(
           (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
 
         if (daysDifference > daysInactiveIssues) {
-          // Lock the issue
-          await octokit.rest.issues.lock({
+          // Construct parameters for the lock request
+          const lockParams: any = {
             owner,
             repo,
             issue_number: issue.number,
-            lock_reason: lockReasonIssues,
-          })
+          }
+          if (lockReasonIssues) {
+            lockParams.lock_reason = lockReasonIssues
+          }
+
+          // Lock the issue
+          await octokit.rest.issues.lock(lockParams)
           core.info(
             `Locked issue #${issue.number} due to ${daysInactiveIssues} days of inactivity.`,
           )
@@ -172,6 +179,7 @@ export async function processPullRequests(
   page: number = 1,
 ): Promise<void> {
   const now = new Date()
+  core.info(`Processing PRs on page ${page}`)
 
   // Check rate limit before processing
   const rateLimitStatus = await checkRateLimit(octokit)
@@ -205,13 +213,18 @@ export async function processPullRequests(
         (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
 
       if (daysDifference > daysInactivePRs) {
-        // Lock the PR
-        await octokit.rest.issues.lock({
+        // Construct parameters for the lock request
+        const lockParams: any = {
           owner,
           repo,
           issue_number: pr.number,
-          lock_reason: lockReasonPRs,
-        })
+        }
+        if (lockReasonPRs) {
+          lockParams.lock_reason = lockReasonPRs
+        }
+
+        // Lock the PR
+        await octokit.rest.issues.lock(lockParams)
         core.info(
           `Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`,
         )

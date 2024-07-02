@@ -93,7 +93,7 @@ describe('GitHub Action - Lock issues', () => {
       'test-owner',
       'test-repo',
       30,
-      'off-topic',
+      undefined,
       100,
       100,
       lockedPRs,
@@ -111,7 +111,6 @@ describe('GitHub Action - Lock issues', () => {
       owner: 'test-owner',
       repo: 'test-repo',
       issue_number: 1,
-      lock_reason: 'off-topic',
     })
 
     expect(mockCore.info).toHaveBeenCalledWith(
