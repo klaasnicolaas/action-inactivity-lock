@@ -85,13 +85,6 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
             per_page: perPage,
             page: page,
         });
-        // No more issues to process
-        if (issues.data.length === 0) {
-            core.info(`No more issues to process.`);
-            // Set the output for locked issues
-            core.setOutput('locked-issues', JSON.stringify(lockedIssues));
-            return;
-        }
         for (const issue of issues.data) {
             // Check if it's not a PR
             if (!issue.pull_request) {
@@ -118,8 +111,15 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
                 }
             }
         }
-        // Process next batch
-        await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, lockedIssues, page + 1);
+        if (issues.data.length === perPage) {
+            // Process next batch
+            await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, lockedIssues, page + 1);
+        }
+        else {
+            core.info(`No more issues to process.`);
+            // Set the output for locked issues
+            core.setOutput('locked-issues', JSON.stringify(lockedIssues));
+        }
     }
     catch (error) {
         if (error instanceof Error) {
@@ -144,13 +144,6 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
             per_page: perPage,
             page: page,
         });
-        // No more PRs to process
-        if (pullRequests.data.length === 0) {
-            core.info(`No more PRs to process.`);
-            // Set the output for locked PRs
-            core.setOutput('locked-prs', JSON.stringify(lockedPRs));
-            return;
-        }
         for (const pr of pullRequests.data) {
             const lastUpdated = new Date(pr.updated_at);
             const daysDifference = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
@@ -174,8 +167,15 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
                 core.debug(`PR #${pr.number} has only ${daysDifference} days of inactivity.`);
             }
         }
-        // Process next batch
-        await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, lockedPRs, page + 1);
+        if (pullRequests.data.length === perPage) {
+            // Process next batch
+            await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, lockedPRs, page + 1);
+        }
+        else {
+            core.info(`No more PRs to process.`);
+            // Set the output for locked PRs
+            core.setOutput('locked-prs', JSON.stringify(lockedPRs));
+        }
     }
     catch (error) {
         if (error instanceof Error) {
