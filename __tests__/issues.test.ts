@@ -85,7 +85,7 @@ describe('GitHub Action - Lock issues', () => {
 
     // @ts-ignore - Ignore missing properties
     const mockLock = jest.fn().mockResolvedValue({})
-    const lockedPRs: { number: number, title: string }[] = []
+    const lockedPRs: { number: number; title: string }[] = []
     mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
 
     await processIssues(

@@ -48,7 +48,7 @@ async function run() {
         const { owner, repo } = github_1.context.repo;
         const perPage = 100; // Batch size for processing
         core.info('Starting processing of issues and pull requests.');
-        const rateLimitStatus = await checkRateLimit(octokit);
+        const rateLimitStatus = (await checkRateLimit(octokit));
         if (rateLimitStatus.remaining > rateLimitBuffer) {
             core.info('Sufficient rate limit available, starting processing.');
             // Process issues and PRs in parallel
@@ -62,8 +62,9 @@ async function run() {
         }
     }
     catch (error) {
-        if (error instanceof Error)
-            core.setFailed(error.message);
+        if (error instanceof Error) {
+            core.setFailed(`Action failed with error: ${error.message}`);
+        }
     }
 }
 async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, lockedIssues = [], page = 1) {
@@ -115,7 +116,9 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
         await processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, lockedIssues, page + 1);
     }
     catch (error) {
-        core.setFailed(`Failed to process issues: ${error}`);
+        if (error instanceof Error) {
+            core.setFailed(`Failed to process issues: ${error.message}`);
+        }
     }
 }
 async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, lockedPRs = [], page = 1) {
@@ -164,20 +167,31 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
         await processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, lockedPRs, page + 1);
     }
     catch (error) {
-        core.setFailed(`Failed to process pull requests: ${error}`);
+        if (error instanceof Error) {
+            core.setFailed(`Failed to process pull requests: ${error.message}`);
+        }
     }
 }
 async function checkRateLimit(octokit) {
-    const rateLimit = await octokit.rest.rateLimit.get();
-    const remaining = rateLimit.data.resources.core.remaining;
-    const reset = rateLimit.data.resources.core.reset;
-    const now = Math.floor(Date.now() / 1000);
-    const resetTimeInSeconds = reset - now;
-    const resetTimeHumanReadable = new Date(reset * 1000).toLocaleString();
-    core.info(`Rate limit remaining: ${remaining}`);
-    core.info(`Rate limit resets at: ${resetTimeHumanReadable}`);
-    return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable };
+    try {
+        const rateLimit = await octokit.rest.rateLimit.get();
+        const remaining = rateLimit.data.resources.core.remaining;
+        const reset = rateLimit.data.resources.core.reset;
+        const now = Math.floor(Date.now() / 1000);
+        const resetTimeInSeconds = reset - now;
+        const resetTimeHumanReadable = new Date(reset * 1000).toLocaleString();
+        core.info(`Rate limit remaining: ${remaining}`);
+        core.info(`Rate limit resets at: ${resetTimeHumanReadable}`);
+        return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable };
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            core.setFailed(`Failed to check rate limit: ${error.message}`);
+        }
+        return { remaining: 0, resetTime: 0, resetTimeHumanReadable: '' };
+    }
 }
+// Run the action
 run();
 
 

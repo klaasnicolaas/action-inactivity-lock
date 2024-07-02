@@ -1,6 +1,12 @@
 import * as core from '@actions/core'
 import { context, getOctokit } from '@actions/github'
 
+interface RateLimitStatus {
+  remaining: number
+  resetTime: number
+  resetTimeHumanReadable: string
+}
+
 export async function run(): Promise<void> {
   try {
     const token = core.getInput('repo-token')
@@ -29,7 +35,7 @@ export async function run(): Promise<void> {
 
     core.info('Starting processing of issues and pull requests.')
 
-    const rateLimitStatus = await checkRateLimit(octokit)
+    const rateLimitStatus = (await checkRateLimit(octokit)) as RateLimitStatus
     if (rateLimitStatus.remaining > rateLimitBuffer) {
       core.info('Sufficient rate limit available, starting processing.')
       // Process issues and PRs in parallel
@@ -57,7 +63,9 @@ export async function run(): Promise<void> {
       core.warning('Initial rate limit too low, stopping processing.')
     }
   } catch (error) {
-    if (error instanceof Error) core.setFailed(error.message)
+    if (error instanceof Error) {
+      core.setFailed(`Action failed with error: ${error.message}`)
+    }
   }
 }
 
@@ -146,7 +154,9 @@ export async function processIssues(
       page + 1,
     )
   } catch (error) {
-    core.setFailed(`Failed to process issues: ${error}`)
+    if (error instanceof Error) {
+      core.setFailed(`Failed to process issues: ${error.message}`)
+    }
   }
 }
 
@@ -227,23 +237,35 @@ export async function processPullRequests(
       page + 1,
     )
   } catch (error) {
-    core.setFailed(`Failed to process pull requests: ${error}`)
+    if (error instanceof Error) {
+      core.setFailed(`Failed to process pull requests: ${error.message}`)
+    }
   }
 }
 
-export async function checkRateLimit(octokit: ReturnType<typeof getOctokit>) {
-  const rateLimit = await octokit.rest.rateLimit.get()
-  const remaining = rateLimit.data.resources.core.remaining
-  const reset = rateLimit.data.resources.core.reset
+export async function checkRateLimit(
+  octokit: ReturnType<typeof getOctokit>,
+): Promise<RateLimitStatus> {
+  try {
+    const rateLimit = await octokit.rest.rateLimit.get()
+    const remaining = rateLimit.data.resources.core.remaining
+    const reset = rateLimit.data.resources.core.reset
 
-  const now = Math.floor(Date.now() / 1000)
-  const resetTimeInSeconds = reset - now
-  const resetTimeHumanReadable = new Date(reset * 1000).toLocaleString()
+    const now = Math.floor(Date.now() / 1000)
+    const resetTimeInSeconds = reset - now
+    const resetTimeHumanReadable = new Date(reset * 1000).toLocaleString()
 
-  core.info(`Rate limit remaining: ${remaining}`)
-  core.info(`Rate limit resets at: ${resetTimeHumanReadable}`)
+    core.info(`Rate limit remaining: ${remaining}`)
+    core.info(`Rate limit resets at: ${resetTimeHumanReadable}`)
 
-  return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable }
+    return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable }
+  } catch (error) {
+    if (error instanceof Error) {
+      core.setFailed(`Failed to check rate limit: ${error.message}`)
+    }
+    return { remaining: 0, resetTime: 0, resetTimeHumanReadable: '' }
+  }
 }
 
+// Run the action
 run()
