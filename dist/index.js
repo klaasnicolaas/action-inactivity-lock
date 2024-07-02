@@ -48,6 +48,7 @@ async function run() {
         const { owner, repo } = github_1.context.repo;
         const perPage = 100; // Batch size for processing
         core.info('Starting processing of issues and pull requests.');
+        core.info('Checking rate limit before processing.');
         const rateLimitStatus = (await checkRateLimit(octokit));
         if (rateLimitStatus.remaining > rateLimitBuffer) {
             core.info('Sufficient rate limit available, starting processing.');
@@ -69,6 +70,7 @@ async function run() {
 }
 async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReasonIssues, perPage, rateLimitBuffer, lockedIssues = [], page = 1) {
     const now = new Date();
+    core.info(`Processing issues on page ${page}`);
     // Check rate limit before processing
     const rateLimitStatus = await checkRateLimit(octokit);
     if (rateLimitStatus.remaining <= rateLimitBuffer) {
@@ -96,13 +98,17 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
                 const lastUpdated = new Date(issue.updated_at);
                 const daysDifference = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
                 if (daysDifference > daysInactiveIssues) {
-                    // Lock the issue
-                    await octokit.rest.issues.lock({
+                    // Construct parameters for the lock request
+                    const lockParams = {
                         owner,
                         repo,
                         issue_number: issue.number,
-                        lock_reason: lockReasonIssues,
-                    });
+                    };
+                    if (lockReasonIssues) {
+                        lockParams.lock_reason = lockReasonIssues;
+                    }
+                    // Lock the issue
+                    await octokit.rest.issues.lock(lockParams);
                     core.info(`Locked issue #${issue.number} due to ${daysInactiveIssues} days of inactivity.`);
                     // Add the locked issue to the list
                     lockedIssues.push({ number: issue.number, title: issue.title });
@@ -123,6 +129,7 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
 }
 async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockReasonPRs, perPage, rateLimitBuffer, lockedPRs = [], page = 1) {
     const now = new Date();
+    core.info(`Processing PRs on page ${page}`);
     // Check rate limit before processing
     const rateLimitStatus = await checkRateLimit(octokit);
     if (rateLimitStatus.remaining <= rateLimitBuffer) {
@@ -148,13 +155,17 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
             const lastUpdated = new Date(pr.updated_at);
             const daysDifference = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
             if (daysDifference > daysInactivePRs) {
-                // Lock the PR
-                await octokit.rest.issues.lock({
+                // Construct parameters for the lock request
+                const lockParams = {
                     owner,
                     repo,
                     issue_number: pr.number,
-                    lock_reason: lockReasonPRs,
-                });
+                };
+                if (lockReasonPRs) {
+                    lockParams.lock_reason = lockReasonPRs;
+                }
+                // Lock the PR
+                await octokit.rest.issues.lock(lockParams);
                 core.info(`Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`);
                 // Add the locked PR to the list
                 lockedPRs.push({ number: pr.number, title: pr.title });

@@ -134,7 +134,7 @@ describe('GitHub Action - Rate Limit Handling', () => {
       data: {
         resources: {
           core: {
-            remaining: 0,
+            remaining: 50,
             reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
           },
         },
