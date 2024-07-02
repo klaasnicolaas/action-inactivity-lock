@@ -94,7 +94,7 @@ The reason that will be used to lock the pull requests. Valid reasons are: `off-
 
 ## Outputs
 
-The following output parameters can be retrieved from the action.
+The following output can be used to display the locked issues and pull requests.
 
 Both outputs are a list of objects with the following structure:
 
