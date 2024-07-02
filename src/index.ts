@@ -107,14 +107,6 @@ export async function processIssues(
       page: page,
     })
 
-    // No more issues to process
-    if (issues.data.length === 0) {
-      core.info(`No more issues to process.`)
-      // Set the output for locked issues
-      core.setOutput('locked-issues', JSON.stringify(lockedIssues))
-      return
-    }
-
     for (const issue of issues.data) {
       // Check if it's not a PR
       if (!issue.pull_request) {
@@ -148,18 +140,24 @@ export async function processIssues(
       }
     }
 
-    // Process next batch
-    await processIssues(
-      octokit,
-      owner,
-      repo,
-      daysInactiveIssues,
-      lockReasonIssues,
-      perPage,
-      rateLimitBuffer,
-      lockedIssues,
-      page + 1,
-    )
+    if (issues.data.length === perPage) {
+      // Process next batch
+      await processIssues(
+        octokit,
+        owner,
+        repo,
+        daysInactiveIssues,
+        lockReasonIssues,
+        perPage,
+        rateLimitBuffer,
+        lockedIssues,
+        page + 1,
+      )
+    } else {
+      core.info(`No more issues to process.`)
+      // Set the output for locked issues
+      core.setOutput('locked-issues', JSON.stringify(lockedIssues))
+    }
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(`Failed to process issues: ${error.message}`)
@@ -199,14 +197,6 @@ export async function processPullRequests(
       page: page,
     })
 
-    // No more PRs to process
-    if (pullRequests.data.length === 0) {
-      core.info(`No more PRs to process.`)
-      // Set the output for locked PRs
-      core.setOutput('locked-prs', JSON.stringify(lockedPRs))
-      return
-    }
-
     for (const pr of pullRequests.data) {
       const lastUpdated = new Date(pr.updated_at)
       const daysDifference =
@@ -237,18 +227,24 @@ export async function processPullRequests(
       }
     }
 
-    // Process next batch
-    await processPullRequests(
-      octokit,
-      owner,
-      repo,
-      daysInactivePRs,
-      lockReasonPRs,
-      perPage,
-      rateLimitBuffer,
-      lockedPRs,
-      page + 1,
-    )
+    if (pullRequests.data.length === perPage) {
+      // Process next batch
+      await processPullRequests(
+        octokit,
+        owner,
+        repo,
+        daysInactivePRs,
+        lockReasonPRs,
+        perPage,
+        rateLimitBuffer,
+        lockedPRs,
+        page + 1,
+      )
+    } else {
+      core.info(`No more PRs to process.`)
+      // Set the output for locked PRs
+      core.setOutput('locked-prs', JSON.stringify(lockedPRs))
+    }
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(`Failed to process pull requests: ${error.message}`)
