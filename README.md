@@ -1,4 +1,4 @@
-## 🔒 Inactifity Lock
+## 🔒 Inactivity Lock
 
 [![GitHub Release][releases-shield]][releases]
 ![Project Stage][project-stage-shield]
@@ -94,7 +94,7 @@ The reason that will be used to lock the pull requests. Valid reasons are: `off-
 
 ## Outputs
 
-The following outputs parameters can retrieved from the action.
+The following output parameters can be retrieved from the action.
 
 Both outputs are a list of objects with the following structure:
 
