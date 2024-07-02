@@ -1,6 +1,6 @@
 name: "Inactivity Lock"
 author: "Klaas Schoute <hello@student-techlife.com>"
-description: "Automatically locks inactive issues and pull requests after a period of inactivity"
+description: "Automatically locks issues and pull requests after a period of inactivity"
 
 branding:
   icon: "lock"
