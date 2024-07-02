@@ -98,7 +98,7 @@ describe('GitHub Action - Rate Limit Handling', () => {
 
     // Adjusted assertions for human-readable reset time
     expect(rateLimitStatus.resetTimeHumanReadable).toEqual(
-      new Date(expectedReset * 1000).toLocaleString(),
+      new Date(expectedReset * 1000).toUTCString(),
     )
 
     // Ensure core.info was called with rate limit information
@@ -106,7 +106,7 @@ describe('GitHub Action - Rate Limit Handling', () => {
       `Rate limit remaining: ${expectedRemaining}`,
     )
     expect(core.info).toHaveBeenCalledWith(
-      `Rate limit resets at: ${new Date(expectedReset * 1000).toLocaleString()}`,
+      `Rate limit resets at: ${new Date(expectedReset * 1000).toUTCString()}`,
     )
   })
 

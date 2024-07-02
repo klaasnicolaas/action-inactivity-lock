@@ -266,7 +266,7 @@ export async function checkRateLimit(
 
     const now = Math.floor(Date.now() / 1000)
     const resetTimeInSeconds = reset - now
-    const resetTimeHumanReadable = new Date(reset * 1000).toLocaleString()
+    const resetTimeHumanReadable = new Date(reset * 1000).toUTCString()
 
     core.info(`Rate limit remaining: ${remaining}`)
     core.info(`Rate limit resets at: ${resetTimeHumanReadable}`)
