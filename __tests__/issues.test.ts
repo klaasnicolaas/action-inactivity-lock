@@ -182,6 +182,58 @@ describe('GitHub Action - Lock issues', () => {
     })
   })
 
+  it('should not lock issues that are already locked', async () => {
+    mockCore.getInput.mockImplementation((name) => {
+      if (name === 'repo-token') return 'fake-token'
+      if (name === 'days-inactive-issues') return '30'
+      if (name === 'lock-reason-issues') return 'off-topic'
+      return ''
+    })
+
+    // Mock response for listForRepo
+    mockOctokit.rest.issues.listForRepo.mockImplementation(
+      async ({ owner, repo, state, per_page, page }) => {
+        // Simulate fetching issues
+        if (page === 1) {
+          return {
+            data: [
+              {
+                number: 1,
+                title: 'Test issue',
+                pull_request: null,
+                locked: true, // Issue is already locked
+                updated_at: '2023-06-29T12:00:00Z',
+              },
+            ],
+          }
+        } else {
+          return {
+            data: [], // Simulate no more issues on subsequent pages
+          }
+        }
+      },
+    )
+
+    // @ts-ignore - Ignore missing properties
+    const mockLock = jest.fn().mockResolvedValue({})
+    const lockedIssues: { number: number; title: string }[] = []
+    mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
+
+    await processIssues(
+      mockOctokit,
+      'test-owner',
+      'test-repo',
+      30,
+      'off-topic',
+      100,
+      100,
+      lockedIssues,
+    )
+
+    expect(mockOctokit.rest.issues.lock).not.toHaveBeenCalled()
+    expect(core.debug).toHaveBeenCalledWith('Issue #1 is already locked.')
+  })
+
   it('should not lock issues that are less than 30 days inactive', async () => {
     mockCore.getInput.mockImplementation((name) => {
       if (name === 'repo-token') return 'fake-token'
