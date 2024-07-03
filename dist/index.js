@@ -87,7 +87,7 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
         });
         for (const issue of issues.data) {
             // Check if it's not a PR
-            if (!issue.pull_request) {
+            if (!issue.pull_request && !issue.locked) {
                 const lastUpdated = new Date(issue.updated_at);
                 const daysDifference = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
                 if (daysDifference > daysInactiveIssues) {
@@ -109,6 +109,9 @@ async function processIssues(octokit, owner, repo, daysInactiveIssues, lockReaso
                 else {
                     core.debug(`Issue #${issue.number} has only ${daysDifference} days of inactivity.`);
                 }
+            }
+            else if (issue.locked) {
+                core.debug(`Issue #${issue.number} is already locked.`);
             }
         }
         if (issues.data.length === perPage) {
@@ -145,26 +148,31 @@ async function processPullRequests(octokit, owner, repo, daysInactivePRs, lockRe
             page: page,
         });
         for (const pr of pullRequests.data) {
-            const lastUpdated = new Date(pr.updated_at);
-            const daysDifference = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
-            if (daysDifference > daysInactivePRs) {
-                // Construct parameters for the lock request
-                const lockParams = {
-                    owner,
-                    repo,
-                    issue_number: pr.number,
-                };
-                if (lockReasonPRs) {
-                    lockParams.lock_reason = lockReasonPRs;
+            if (!pr.locked) {
+                const lastUpdated = new Date(pr.updated_at);
+                const daysDifference = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
+                if (daysDifference > daysInactivePRs) {
+                    // Construct parameters for the lock request
+                    const lockParams = {
+                        owner,
+                        repo,
+                        issue_number: pr.number,
+                    };
+                    if (lockReasonPRs) {
+                        lockParams.lock_reason = lockReasonPRs;
+                    }
+                    // Lock the PR
+                    await octokit.rest.issues.lock(lockParams);
+                    core.info(`Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`);
+                    // Add the locked PR to the list
+                    lockedPRs.push({ number: pr.number, title: pr.title });
                 }
-                // Lock the PR
-                await octokit.rest.issues.lock(lockParams);
-                core.info(`Locked PR #${pr.number} due to ${daysInactivePRs} days of inactivity.`);
-                // Add the locked PR to the list
-                lockedPRs.push({ number: pr.number, title: pr.title });
+                else {
+                    core.debug(`PR #${pr.number} has only ${daysDifference} days of inactivity.`);
+                }
             }
-            else {
-                core.debug(`PR #${pr.number} has only ${daysDifference} days of inactivity.`);
+            else if (pr.locked) {
+                core.debug(`PR #${pr.number} is already locked.`);
             }
         }
         if (pullRequests.data.length === perPage) {

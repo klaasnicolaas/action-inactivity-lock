@@ -180,6 +180,65 @@ describe('GitHub Action - Lock PRs', () => {
     })
   })
 
+  it('should not lock PRs that are already locked', async () => {
+    mockCore.getInput.mockImplementation((name) => {
+      if (name === 'repo-token') return 'fake-token'
+      if (name === 'days-inactive-prs') return '30'
+      if (name === 'lock-reason-prs') return 'off-topic'
+      return ''
+    })
+
+    // Mock response for pulls.list
+    mockOctokit.rest.pulls.list.mockImplementation(
+      async ({ owner, repo, state, per_page, page }) => {
+        // Simulate fetching PRs
+        if (page === 1) {
+          return {
+            data: [
+              {
+                number: 1,
+                title: 'Test PR',
+                updated_at: '2023-05-29T12:00:00Z', // Assuming this PR is inactive
+                locked: true,
+              },
+            ],
+          }
+        } else {
+          return {
+            data: [], // Simulate no more PRs on subsequent pages
+          }
+        }
+      },
+    )
+
+    // @ts-ignore - Ignore missing properties
+    const mockLock = jest.fn().mockResolvedValue({})
+    const lockedPRs: { number: number; title: string }[] = []
+    mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
+
+    await processPullRequests(
+      mockOctokit,
+      'test-owner',
+      'test-repo',
+      30,
+      'off-topic',
+      100,
+      100,
+      lockedPRs,
+    )
+
+    expect(mockOctokit.rest.pulls.list).toHaveBeenCalledWith({
+      owner: 'test-owner',
+      repo: 'test-repo',
+      state: 'closed',
+      per_page: 100,
+      page: 1,
+    })
+
+    expect(mockOctokit.rest.issues.lock).not.toHaveBeenCalled()
+    expect(core.debug).toHaveBeenCalledWith('PR #1 is already locked.')
+  })
+
   it('should not lock PRs that are less than 30 days inactive', async () => {
     mockCore.getInput.mockImplementation((name) => {
       if (name === 'repo-token') return 'fake-token'
