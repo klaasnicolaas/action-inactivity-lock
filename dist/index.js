@@ -72,7 +72,9 @@ async function run() {
             await checkRateLimit(octokit);
             core.info('Processing completed.');
         }
-        core.warning('Initial rate limit too low, stopping processing.');
+        else {
+            core.warning('Initial rate limit too low, stopping processing.');
+        }
     }
     catch (error) {
         if (error instanceof Error) {

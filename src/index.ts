@@ -85,8 +85,9 @@ export async function run(): Promise<void> {
       // Check rate limit after processing
       await checkRateLimit(octokit)
       core.info('Processing completed.')
+    } else {
+      core.warning('Initial rate limit too low, stopping processing.')
     }
-    core.warning('Initial rate limit too low, stopping processing.')
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(`Action failed with error: ${error.message}`)
