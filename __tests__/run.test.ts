@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { run, checkRateLimit } from '../src/index'
+import { run } from '../src/index'
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
 
 jest.mock('@actions/core')
@@ -11,9 +11,11 @@ const mockGithub = github as jest.Mocked<typeof github>
 
 describe('GitHub Action - Run', () => {
   let mockOctokit: any
+  const currentDate = new Date('2023-07-01T00:00:00Z')
 
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.useFakeTimers().setSystemTime(currentDate)
 
     // Mock context.repo using Object.defineProperty
     Object.defineProperty(mockGithub.context, 'repo', {
@@ -27,12 +29,11 @@ describe('GitHub Action - Run', () => {
     // Mock Octokit instance with rate limit functionality
     mockOctokit = {
       rest: {
-        issues: {
-          listForRepo: jest.fn(),
-          lock: jest.fn(),
+        search: {
+          issuesAndPullRequests: jest.fn(),
         },
-        pulls: {
-          list: jest.fn(),
+        issues: {
+          lock: jest.fn(),
         },
         rateLimit: {
           get: jest.fn().mockImplementation(() => {
@@ -56,24 +57,26 @@ describe('GitHub Action - Run', () => {
   })
 
   it('should get all necessary action inputs', async () => {
-    const mockGetInput = core.getInput as jest.Mock
-
-    mockGetInput.mockImplementation((name) => {
+    mockCore.getInput.mockImplementation((name) => {
       if (name === 'repo-token') return 'fake-token'
       if (name === 'rate-limit-buffer') return '100'
       if (name === 'days-inactive-issues') return '30'
       if (name === 'days-inactive-prs') return '30'
       if (name === 'lock-reason-issues') return 'off-topic'
       if (name === 'lock-reason-prs') return 'off-topic'
+      return ''
     })
 
     await run()
 
-    expect(mockGetInput).toHaveBeenCalledWith('repo-token')
-    expect(mockGetInput).toHaveBeenCalledWith('rate-limit-buffer')
-    expect(mockGetInput).toHaveBeenCalledWith('days-inactive-issues')
-    expect(mockGetInput).toHaveBeenCalledWith('days-inactive-prs')
-    expect(mockGetInput).toHaveBeenCalledWith('lock-reason-issues')
-    expect(mockGetInput).toHaveBeenCalledWith('lock-reason-prs')
+    expect(mockCore.getInput).toHaveBeenCalledWith('repo-token')
+    expect(mockCore.getInput).toHaveBeenCalledWith('rate-limit-buffer')
+    expect(mockCore.getInput).toHaveBeenCalledWith('days-inactive-issues')
+    expect(mockCore.getInput).toHaveBeenCalledWith('days-inactive-prs')
+    expect(mockCore.getInput).toHaveBeenCalledWith('lock-reason-issues')
+    expect(mockCore.getInput).toHaveBeenCalledWith('lock-reason-prs')
+
+    // Ensure getInput is called 6 times
+    expect(mockCore.getInput).toHaveBeenCalledTimes(6)
   })
 })
