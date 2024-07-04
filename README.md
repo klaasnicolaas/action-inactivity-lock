@@ -10,6 +10,8 @@
 
 This GitHub action is useful for repositories that want to lock issues and pull requests after a certain period of inactivity, to keep the repository clean and organized.
 
+For fetching the issues and pull requests, the action uses the [GraphQL API](https://docs.github.com/en/graphql/overview). Instead of a REST API search call, which is very limited in the number of API calls, with the result that you can quickly encounter a [secondary ratelimit](https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#rate-limit) error.
+
 ### Features
 
 - **Lock Issues & Pull Requests**: Locks issues and pull requests after a certain period of inactivity.
@@ -144,7 +146,7 @@ jobs:
       - name: 🔍 Display locked issues and PRs
         run: |
           echo "Locked issues: ${{ steps.lock.outputs.locked-issues }}"
-          echo "Locked PRs: ${{ steps.lock.outputs.locked-prsd }}"
+          echo "Locked PRs: ${{ steps.lock.outputs.locked-prs }}"
 ```
 
 ## Contributing
