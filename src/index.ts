@@ -1,17 +1,11 @@
 import * as core from '@actions/core'
 import { context, getOctokit } from '@actions/github'
+import { graphql } from '@octokit/graphql'
+import * as fs from 'fs'
+import { RateLimitData, RateLimitStatus, Thread, GraphQLResponse } from './interfaces'
 
-/**
- * Rate limit status object.
- * @property remaining Number of requests remaining.
- * @property resetTime Time when the rate limit resets.
- * @property resetTimeHumanReadable Human-readable time when the rate limit resets.
- */
-interface RateLimitStatus {
-  remaining: number
-  resetTime: number
-  resetTimeHumanReadable: string
-}
+// GraphQL query file path
+const queryFilePath = 'searchThreads.graphql'
 
 /**
  * Main function to run the action.
@@ -42,7 +36,6 @@ export async function run(): Promise<void> {
 
     const octokit = getOctokit(token)
     const { owner, repo } = context.repo
-    const perPage = 100 // Batch size for processing
 
     core.info('Starting processing of issues and pull requests.')
     core.info('Checking rate limit before processing.')
@@ -52,13 +45,7 @@ export async function run(): Promise<void> {
       core.info('Sufficient rate limit available, starting processing.')
 
       // Fetch all relevant issues and PRs
-      const items = await fetchIssuesAndPRs(
-        octokit,
-        owner,
-        repo,
-        perPage,
-        rateLimitBuffer,
-      )
+      const items = await fetchThreads(octokit, owner, repo, rateLimitBuffer)
       const issuesList = items.filter((item) => !item.pull_request)
       const pullRequestsList = items.filter((item) => item.pull_request)
 
@@ -107,30 +94,32 @@ export async function run(): Promise<void> {
  * @returns Promise that resolves to an array of fetched items.
  * @throws Error if fetching fails.
  */
-export async function fetchIssuesAndPRs(
+export async function fetchThreads(
   octokit: ReturnType<typeof getOctokit>,
   owner: string,
   repo: string,
-  perPage: number,
   rateLimitBuffer: number,
-  page: number = 1,
-  allItems: any[] = [],
-): Promise<any[]> {
-  core.info(`Fetching issues and PRs on page ${page}`)
+  cursor?: string,
+  allItems: Thread[] = [],
+): Promise<Thread[]> {
+  core.info(`Fetching issues and PRs${cursor ? ` after ${cursor}` : ''}`)
 
   try {
-    const query = `repo:${owner}/${repo} state:closed is:unlocked`
-    const results = await octokit.rest.search.issuesAndPullRequests({
-      q: query,
-      per_page: perPage,
-      page: page,
+    const query = fs.readFileSync(queryFilePath, 'utf8')
+    const queryString = `repo:${owner}/${repo} state:closed is:unlocked`
+    const results = await graphql<GraphQLResponse>(query, {
+      queryString,
+      cursor: cursor ?? undefined,
+      headers: {
+        authorization: `token ${octokit.auth}`,
+      },
     })
 
-    const fetchedItems = results.data.items
-    allItems.push(...results.data.items)
+    const fetchedItems = results.search.nodes
+    allItems.push(...fetchedItems)
 
     // Check rate limit before continuing
-    const rateLimitStatus = await checkRateLimit(octokit)
+    const rateLimitStatus = await checkRateLimit(octokit, 'graphql')
     if (rateLimitStatus.remaining <= rateLimitBuffer) {
       core.warning(
         `Rate limit exceeded, stopping further fetching. Please wait until ${rateLimitStatus.resetTimeHumanReadable}.`,
@@ -138,15 +127,15 @@ export async function fetchIssuesAndPRs(
       return allItems
     }
 
-    if (fetchedItems.length === perPage) {
+    if (results.search.pageInfo.hasNextPage) {
+      const nextCursor = results.search.pageInfo.endCursor as string
       // Fetch next batch
-      return fetchIssuesAndPRs(
+      return fetchThreads(
         octokit,
         owner,
         repo,
-        perPage,
         rateLimitBuffer,
-        page + 1,
+        nextCursor,
         allItems,
       )
     } else {
@@ -155,7 +144,9 @@ export async function fetchIssuesAndPRs(
     }
   } catch (error) {
     if (error instanceof Error) {
-      core.setFailed(`Failed to fetch issues and PRs: ${error.message}`)
+      core.setFailed(
+        `Failed to fetch issues and PRs using GraphQL: ${error.message}`,
+      )
     }
     return allItems
   }
@@ -176,7 +167,7 @@ export async function processIssues(
   octokit: ReturnType<typeof getOctokit>,
   owner: string,
   repo: string,
-  issuesList: any[],
+  issuesList: Thread[],
   daysInactiveIssues: number,
   lockReasonIssues:
     | 'off-topic'
@@ -189,7 +180,7 @@ export async function processIssues(
   const lockedIssues: { number: number; title: string }[] = []
 
   for (const issue of issuesList) {
-    const lastUpdated = new Date(issue.updated_at)
+    const lastUpdated = new Date(issue.updatedAt)
     const daysDifference =
       (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
 
@@ -226,7 +217,7 @@ export async function processPullRequests(
   octokit: ReturnType<typeof getOctokit>,
   owner: string,
   repo: string,
-  pullRequestsList: any[],
+  pullRequestsList: Thread[],
   daysInactivePRs: number,
   lockReasonPRs: 'off-topic' | 'too heated' | 'resolved' | 'spam' | undefined,
 ): Promise<void> {
@@ -234,7 +225,7 @@ export async function processPullRequests(
   const lockedPRs: { number: number; title: string }[] = []
 
   for (const pr of pullRequestsList) {
-    const lastUpdated = new Date(pr.updated_at)
+    const lastUpdated = new Date(pr.updatedAt)
     const daysDifference =
       (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24)
 
@@ -299,11 +290,19 @@ export async function lockItem(
  */
 export async function checkRateLimit(
   octokit: ReturnType<typeof getOctokit>,
+  apiType: keyof RateLimitData = 'core',
 ): Promise<RateLimitStatus> {
   try {
+    // Fetch rate limit data for REST API
     const rateLimit = await octokit.rest.rateLimit.get()
-    const remaining = rateLimit.data.resources.core.remaining
-    const reset = rateLimit.data.resources.core.reset
+    const rateLimitData: RateLimitData = rateLimit.data.resources
+
+    // Check if rateLimitData[apiType] is defined
+    if (!rateLimitData[apiType]) {
+      throw new Error(`Rate limit data for '${apiType}' not found.`)
+    }
+
+    const { remaining, reset } = rateLimitData[apiType]
 
     const now = Math.floor(Date.now() / 1000)
     const resetTimeInSeconds = reset - now
