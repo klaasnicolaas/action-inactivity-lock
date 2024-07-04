@@ -1,9 +1,14 @@
 import * as core from '@actions/core'
-import { context, getOctokit } from '@actions/github'
 import { graphql } from '@octokit/graphql'
-import { RateLimitData, RateLimitStatus, Thread, GraphQLResponse } from './interfaces'
-import { searchThreadsQuery } from './queries'
+import { context, getOctokit } from '@actions/github'
 
+import {
+  RateLimitData,
+  RateLimitStatus,
+  Thread,
+  GraphQLResponse,
+} from './interfaces'
+import { searchThreadsQuery } from './queries'
 
 /**
  * Main function to run the action.
@@ -43,9 +48,14 @@ export async function run(): Promise<void> {
       core.info('Sufficient rate limit available, starting processing.')
 
       // Fetch all relevant issues and PRs
-      const items = await fetchThreads(octokit, owner, repo, token, rateLimitBuffer)
-      const issuesList = items.filter(item => item.__typename === 'Issue');
-      const pullRequestsList = items.filter(item => item.__typename === 'PullRequest');
+      const items = await fetchThreads(
+        octokit,
+        owner,
+        repo,
+        token,
+        rateLimitBuffer,
+      )
+      const { issuesList, pullRequestsList } = filterItems(items)
 
       // Log the total number of fetched issues and PRs
       core.info(`Total fetched issues: ${issuesList.length}`)
@@ -79,9 +89,23 @@ export async function run(): Promise<void> {
     }
   } catch (error) {
     if (error instanceof Error) {
-      core.setFailed(`Action failed with error: ${error.message}`)
+      const errorMessage = (error as Error).message
+      core.setFailed(`Action failed with error: ${errorMessage}`)
     }
   }
+}
+
+/**
+ * Filters items into issues and pull requests.
+ * @param items List of items to filter.
+ * @returns Object with separate lists for issues and pull requests.
+ */
+export function filterItems(items: Thread[]) {
+  const issuesList = items.filter((item) => item.__typename === 'Issue')
+  const pullRequestsList = items.filter(
+    (item) => item.__typename === 'PullRequest',
+  )
+  return { issuesList, pullRequestsList }
 }
 
 /**
@@ -89,9 +113,9 @@ export async function run(): Promise<void> {
  * @param octokit Octokit instance.
  * @param owner Owner of the repository.
  * @param repo Name of the repository.
- * @param perPage Number of items to fetch per page.
+ * @param token Personal access token for GitHub API.
  * @param rateLimitBuffer Buffer for remaining rate limit checks.
- * @param page Page number to fetch.
+ * @param cursor Optional cursor for fetching next page.
  * @param allItems Array of fetched items.
  * @returns Promise that resolves to an array of fetched items.
  * @throws Error if fetching fails.
@@ -147,8 +171,9 @@ export async function fetchThreads(
     }
   } catch (error) {
     if (error instanceof Error) {
+      const errorMessage = (error as Error).message
       core.setFailed(
-        `Failed to fetch issues and PRs using GraphQL: ${error.message}`,
+        `Failed to fetch issues and PRs using GraphQL: ${errorMessage}`,
       )
     }
     return allItems
@@ -281,7 +306,8 @@ export async function lockItem(
     await octokit.rest.issues.lock(lockParams)
   } catch (error) {
     if (error instanceof Error) {
-      core.setFailed(`Failed to lock issue/PR #${itemNumber}: ${error.message}`)
+      const errorMessage = (error as Error).message
+      core.setFailed(`Failed to lock issue/PR #${itemNumber}: ${errorMessage}`)
     }
   }
 }
@@ -305,7 +331,7 @@ export async function checkRateLimit(
       throw new Error(`Rate limit data for '${apiType}' not found.`)
     }
 
-    const { remaining, reset } = rateLimitData[apiType]
+    let { remaining, reset } = rateLimitData[apiType]
 
     const now = Math.floor(Date.now() / 1000)
     const resetTimeInSeconds = reset - now
@@ -317,7 +343,8 @@ export async function checkRateLimit(
     return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable }
   } catch (error) {
     if (error instanceof Error) {
-      core.setFailed(`Failed to check rate limit: ${error.message}`)
+      const errorMessage = (error as Error).message
+      core.setFailed(`Failed to check rate limit: ${errorMessage}`)
     }
     return { remaining: 0, resetTime: 0, resetTimeHumanReadable: '' }
   }

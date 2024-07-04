@@ -31,14 +31,15 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.run = run;
+exports.filterItems = filterItems;
 exports.fetchThreads = fetchThreads;
 exports.processIssues = processIssues;
 exports.processPullRequests = processPullRequests;
 exports.lockItem = lockItem;
 exports.checkRateLimit = checkRateLimit;
 const core = __importStar(__nccwpck_require__(2186));
-const github_1 = __nccwpck_require__(5438);
 const graphql_1 = __nccwpck_require__(3414);
+const github_1 = __nccwpck_require__(5438);
 const queries_1 = __nccwpck_require__(3265);
 /**
  * Main function to run the action.
@@ -62,8 +63,7 @@ async function run() {
             core.info('Sufficient rate limit available, starting processing.');
             // Fetch all relevant issues and PRs
             const items = await fetchThreads(octokit, owner, repo, token, rateLimitBuffer);
-            const issuesList = items.filter(item => item.__typename === 'Issue');
-            const pullRequestsList = items.filter(item => item.__typename === 'PullRequest');
+            const { issuesList, pullRequestsList } = filterItems(items);
             // Log the total number of fetched issues and PRs
             core.info(`Total fetched issues: ${issuesList.length}`);
             core.info(`Total fetched PRs: ${pullRequestsList.length}`);
@@ -82,18 +82,29 @@ async function run() {
     }
     catch (error) {
         if (error instanceof Error) {
-            core.setFailed(`Action failed with error: ${error.message}`);
+            const errorMessage = error.message;
+            core.setFailed(`Action failed with error: ${errorMessage}`);
         }
     }
+}
+/**
+ * Filters items into issues and pull requests.
+ * @param items List of items to filter.
+ * @returns Object with separate lists for issues and pull requests.
+ */
+function filterItems(items) {
+    const issuesList = items.filter((item) => item.__typename === 'Issue');
+    const pullRequestsList = items.filter((item) => item.__typename === 'PullRequest');
+    return { issuesList, pullRequestsList };
 }
 /**
  * Fetches closed issues and pull requests from a GitHub repository.
  * @param octokit Octokit instance.
  * @param owner Owner of the repository.
  * @param repo Name of the repository.
- * @param perPage Number of items to fetch per page.
+ * @param token Personal access token for GitHub API.
  * @param rateLimitBuffer Buffer for remaining rate limit checks.
- * @param page Page number to fetch.
+ * @param cursor Optional cursor for fetching next page.
  * @param allItems Array of fetched items.
  * @returns Promise that resolves to an array of fetched items.
  * @throws Error if fetching fails.
@@ -129,7 +140,8 @@ async function fetchThreads(octokit, owner, repo, token, rateLimitBuffer, cursor
     }
     catch (error) {
         if (error instanceof Error) {
-            core.setFailed(`Failed to fetch issues and PRs using GraphQL: ${error.message}`);
+            const errorMessage = error.message;
+            core.setFailed(`Failed to fetch issues and PRs using GraphQL: ${errorMessage}`);
         }
         return allItems;
     }
@@ -220,7 +232,8 @@ async function lockItem(octokit, owner, repo, itemNumber, lockReason) {
     }
     catch (error) {
         if (error instanceof Error) {
-            core.setFailed(`Failed to lock issue/PR #${itemNumber}: ${error.message}`);
+            const errorMessage = error.message;
+            core.setFailed(`Failed to lock issue/PR #${itemNumber}: ${errorMessage}`);
         }
     }
 }
@@ -238,7 +251,7 @@ async function checkRateLimit(octokit, apiType = 'core') {
         if (!rateLimitData[apiType]) {
             throw new Error(`Rate limit data for '${apiType}' not found.`);
         }
-        const { remaining, reset } = rateLimitData[apiType];
+        let { remaining, reset } = rateLimitData[apiType];
         const now = Math.floor(Date.now() / 1000);
         const resetTimeInSeconds = reset - now;
         const resetTimeHumanReadable = new Date(reset * 1000).toUTCString();
@@ -248,7 +261,8 @@ async function checkRateLimit(octokit, apiType = 'core') {
     }
     catch (error) {
         if (error instanceof Error) {
-            core.setFailed(`Failed to check rate limit: ${error.message}`);
+            const errorMessage = error.message;
+            core.setFailed(`Failed to check rate limit: ${errorMessage}`);
         }
         return { remaining: 0, resetTime: 0, resetTimeHumanReadable: '' };
     }

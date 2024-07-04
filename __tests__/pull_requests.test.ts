@@ -1,13 +1,17 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { processPullRequests, fetchIssuesAndPRs } from '../src/index'
+import { graphql } from '@octokit/graphql'
+import { processPullRequests, fetchThreads } from '../src/index'
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
+import { Thread } from '../src/interfaces'
 
 jest.mock('@actions/core')
 jest.mock('@actions/github')
+jest.mock('@octokit/graphql')
 
 const mockCore = core as jest.Mocked<typeof core>
 const mockGithub = github as jest.Mocked<typeof github>
+const mockGraphql = graphql as jest.MockedFunction<typeof graphql>
 
 describe('GitHub Action - Lock PRs', () => {
   let mockOctokit: any
@@ -29,9 +33,6 @@ describe('GitHub Action - Lock PRs', () => {
     // Mock Octokit instance with rate limit functionality
     mockOctokit = {
       rest: {
-        search: {
-          issuesAndPullRequests: jest.fn(),
-        },
         issues: {
           lock: jest.fn(),
         },
@@ -64,27 +65,54 @@ describe('GitHub Action - Lock PRs', () => {
       return ''
     })
 
-    const mockItems = [
-      { number: 1, title: 'PR 1', updated_at: "2024-06-30T00:00:00Z" }, // Active issue
-      { number: 2, title: 'PR 2', updated_at: "2024-06-30T00:00:00Z" }, // Active issue
+    const mockItems: Thread[] = [
       {
+        __typename: 'PullRequest',
+        number: 1,
+        title: 'PR 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
+        number: 2,
+        title: 'PR 2',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
         number: 3,
         title: 'PR 3',
-        updated_at: new Date(
-          Date.now() - 31 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-      }, // Inactive issue
+        updatedAt: '2024-05-30T00:00:00Z',
+        closedAt: '2024-05-30T00:00:00Z',
+        locked: false,
+      },
     ]
 
-    mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
-      data: { items: mockItems },
+    mockGraphql.mockResolvedValueOnce({
+      search: {
+        nodes: mockItems,
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: null,
+        },
+      },
     })
 
     const mockSetOutput = jest.spyOn(core, 'setOutput')
     const mockInfo = jest.spyOn(core, 'info')
 
     // Run the action
-    await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 10)
+    await fetchThreads(
+      mockOctokit,
+      'test-owner',
+      'test-repo',
+      'fake-token',
+      100,
+    )
     await processPullRequests(
       mockOctokit,
       'test-owner',
@@ -122,19 +150,45 @@ describe('GitHub Action - Lock PRs', () => {
       return ''
     })
 
-    const mockItems = [
-      { number: 1, title: 'PR 1', updated_at: "2024-06-30T00:00:00Z" }, // Active issue
-      { number: 2, title: 'PR 2', updated_at: "2024-06-30T00:00:00Z" }, // Active issue
+    const mockItems: Thread[] = [
+      {
+        __typename: 'PullRequest',
+        number: 1,
+        title: 'PR 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
+        number: 2,
+        title: 'PR 2',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
     ]
 
-    mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
-      data: { items: mockItems },
+    mockGraphql.mockResolvedValueOnce({
+      search: {
+        nodes: mockItems,
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: null,
+        },
+      },
     })
 
     const mockSetOutput = jest.spyOn(core, 'setOutput')
 
     // Run the action
-    await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 10)
+    await fetchThreads(
+      mockOctokit,
+      'test-owner',
+      'test-repo',
+      'fake-token',
+      100,
+    )
     await processPullRequests(
       mockOctokit,
       'test-owner',

@@ -45,6 +45,10 @@ describe('GitHub Action - Run', () => {
                     remaining: 5000,
                     reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
                   },
+                  graphql: {
+                    remaining: 5000,
+                    reset: Math.floor(Date.now() / 1000) + 3600,
+                  },
                 },
               },
             })
