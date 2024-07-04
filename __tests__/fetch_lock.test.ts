@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { graphql } from '@octokit/graphql'
-import { lockItem, fetchThreads } from '../src/index'
+import { lockItem, fetchThreads, filterItems } from '../src/index'
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
 import { Thread } from '../src/interfaces'
 
@@ -230,5 +230,49 @@ describe('GitHub Action - Fetch & Lock', () => {
     expect(core.setFailed).toHaveBeenCalledWith(
       'Failed to lock issue/PR #1: API error',
     )
+  })
+
+  it('should correctly filter issues and pull requests', () => {
+    const mockItems: Thread[] = [
+      {
+        __typename: 'Issue',
+        number: 1,
+        title: 'Issue 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
+        number: 2,
+        title: 'PR 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'Issue',
+        number: 3,
+        title: 'Issue 2',
+        updatedAt: '2024-05-30T00:00:00Z',
+        closedAt: '2024-05-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
+        number: 4,
+        title: 'PR 2',
+        updatedAt: '2024-05-30T00:00:00Z',
+        closedAt: '2024-05-30T00:00:00Z',
+        locked: false,
+      }
+    ]
+
+    // Act
+    const { issuesList, pullRequestsList } = filterItems(mockItems)
+
+    // Assert
+    expect(issuesList.length).toBe(2)
+    expect(pullRequestsList.length).toBe(2)
   })
 })
