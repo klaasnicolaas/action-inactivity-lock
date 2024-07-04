@@ -3,7 +3,6 @@ name: Lock
 
 # yamllint disable-line rule:truthy
 on:
-  push:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
