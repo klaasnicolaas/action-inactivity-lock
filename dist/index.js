@@ -61,7 +61,7 @@ async function run() {
         if (rateLimitStatus.remaining > rateLimitBuffer) {
             core.info('Sufficient rate limit available, starting processing.');
             // Fetch all relevant issues and PRs
-            const items = await fetchThreads(octokit, owner, repo, rateLimitBuffer);
+            const items = await fetchThreads(octokit, owner, repo, token, rateLimitBuffer);
             const issuesList = items.filter((item) => !item.pull_request);
             const pullRequestsList = items.filter((item) => item.pull_request);
             // Process issues and PRs in parallel
@@ -95,7 +95,7 @@ async function run() {
  * @returns Promise that resolves to an array of fetched items.
  * @throws Error if fetching fails.
  */
-async function fetchThreads(octokit, owner, repo, rateLimitBuffer, cursor, allItems = []) {
+async function fetchThreads(octokit, owner, repo, token, rateLimitBuffer, cursor, allItems = []) {
     core.info(`Fetching issues and PRs${cursor ? ` after ${cursor}` : ''}`);
     try {
         const queryString = `repo:${owner}/${repo} state:closed is:unlocked`;
@@ -103,7 +103,7 @@ async function fetchThreads(octokit, owner, repo, rateLimitBuffer, cursor, allIt
             queryString,
             cursor: cursor ?? undefined,
             headers: {
-                authorization: `token ${octokit.auth}`,
+                authorization: `token ${token}`,
             },
         });
         const fetchedItems = results.search.nodes;
@@ -117,7 +117,7 @@ async function fetchThreads(octokit, owner, repo, rateLimitBuffer, cursor, allIt
         if (results.search.pageInfo.hasNextPage) {
             const nextCursor = results.search.pageInfo.endCursor;
             // Fetch next batch
-            return fetchThreads(octokit, owner, repo, rateLimitBuffer, nextCursor, allItems);
+            return fetchThreads(octokit, owner, repo, token, rateLimitBuffer, nextCursor, allItems);
         }
         else {
             core.info(`Total issues and PRs fetched: ${allItems.length}`);

@@ -43,7 +43,7 @@ export async function run(): Promise<void> {
       core.info('Sufficient rate limit available, starting processing.')
 
       // Fetch all relevant issues and PRs
-      const items = await fetchThreads(octokit, owner, repo, rateLimitBuffer)
+      const items = await fetchThreads(octokit, owner, repo, token, rateLimitBuffer)
       const issuesList = items.filter((item) => !item.pull_request)
       const pullRequestsList = items.filter((item) => item.pull_request)
 
@@ -96,6 +96,7 @@ export async function fetchThreads(
   octokit: ReturnType<typeof getOctokit>,
   owner: string,
   repo: string,
+  token: string,
   rateLimitBuffer: number,
   cursor?: string,
   allItems: Thread[] = [],
@@ -108,7 +109,7 @@ export async function fetchThreads(
       queryString,
       cursor: cursor ?? undefined,
       headers: {
-        authorization: `token ${octokit.auth}`,
+        authorization: `token ${token}`,
       },
     })
 
@@ -131,6 +132,7 @@ export async function fetchThreads(
         octokit,
         owner,
         repo,
+        token,
         rateLimitBuffer,
         nextCursor,
         allItems,
