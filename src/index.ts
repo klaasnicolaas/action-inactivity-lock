@@ -47,6 +47,10 @@ export async function run(): Promise<void> {
       const issuesList = items.filter(item => item.__typename === 'Issue');
       const pullRequestsList = items.filter(item => item.__typename === 'PullRequest');
 
+      // Log the total number of fetched issues and PRs
+      core.info(`Total fetched issues: ${issuesList.length}`)
+      core.info(`Total fetched PRs: ${pullRequestsList.length}`)
+
       // Process issues and PRs in parallel
       await Promise.all([
         processIssues(
@@ -114,7 +118,6 @@ export async function fetchThreads(
     })
 
     const fetchedItems = results.search.nodes
-    core.info(JSON.stringify(fetchedItems))
     allItems.push(...fetchedItems)
 
     // Check rate limit before continuing
@@ -139,7 +142,7 @@ export async function fetchThreads(
         allItems,
       )
     } else {
-      core.info(`Total issues and PRs fetched: ${allItems.length}`)
+      core.info('All issues and PRs fetched.')
       return allItems
     }
   } catch (error) {
@@ -308,8 +311,8 @@ export async function checkRateLimit(
     const resetTimeInSeconds = reset - now
     const resetTimeHumanReadable = new Date(reset * 1000).toUTCString()
 
-    core.info(`Rate limit remaining: ${remaining}`)
-    core.info(`Rate limit resets at: ${resetTimeHumanReadable}`)
+    core.info(`Rate limit ${apiType} - remaining: ${remaining}`)
+    core.info(`Rate limit ${apiType} - resets at: ${resetTimeHumanReadable}`)
 
     return { remaining, resetTime: resetTimeInSeconds, resetTimeHumanReadable }
   } catch (error) {
