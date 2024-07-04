@@ -39,9 +39,7 @@ exports.checkRateLimit = checkRateLimit;
 const core = __importStar(__nccwpck_require__(2186));
 const github_1 = __nccwpck_require__(5438);
 const graphql_1 = __nccwpck_require__(3414);
-const fs = __importStar(__nccwpck_require__(7147));
-// GraphQL query file path
-const queryFilePath = 'searchThreads.graphql';
+const queries_1 = __nccwpck_require__(3265);
 /**
  * Main function to run the action.
  * @returns Promise that resolves when the action is completed.
@@ -100,9 +98,8 @@ async function run() {
 async function fetchThreads(octokit, owner, repo, rateLimitBuffer, cursor, allItems = []) {
     core.info(`Fetching issues and PRs${cursor ? ` after ${cursor}` : ''}`);
     try {
-        const query = fs.readFileSync(queryFilePath, 'utf8');
         const queryString = `repo:${owner}/${repo} state:closed is:unlocked`;
-        const results = await (0, graphql_1.graphql)(query, {
+        const results = await (0, graphql_1.graphql)(queries_1.searchThreadsQuery, {
             queryString,
             cursor: cursor ?? undefined,
             headers: {
@@ -255,6 +252,43 @@ async function checkRateLimit(octokit, apiType = 'core') {
 }
 // Run the action
 run();
+
+
+/***/ }),
+
+/***/ 3265:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.searchThreadsQuery = void 0;
+exports.searchThreadsQuery = `
+query ($queryString: String!, $cursor: String) {
+    search(query: $queryString, type: ISSUE, first: 100, after: $cursor) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        ... on Issue {
+          number
+          title
+          updatedAt
+          closedAt
+          locked
+        }
+        ... on PullRequest {
+          number
+          title
+          updatedAt
+          closedAt
+          locked
+        }
+      }
+    }
+  }
+`;
 
 
 /***/ }),

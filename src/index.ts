@@ -1,11 +1,9 @@
 import * as core from '@actions/core'
 import { context, getOctokit } from '@actions/github'
 import { graphql } from '@octokit/graphql'
-import * as fs from 'fs'
 import { RateLimitData, RateLimitStatus, Thread, GraphQLResponse } from './interfaces'
+import { searchThreadsQuery } from './queries'
 
-// GraphQL query file path
-const queryFilePath = 'searchThreads.graphql'
 
 /**
  * Main function to run the action.
@@ -105,9 +103,8 @@ export async function fetchThreads(
   core.info(`Fetching issues and PRs${cursor ? ` after ${cursor}` : ''}`)
 
   try {
-    const query = fs.readFileSync(queryFilePath, 'utf8')
     const queryString = `repo:${owner}/${repo} state:closed is:unlocked`
-    const results = await graphql<GraphQLResponse>(query, {
+    const results = await graphql<GraphQLResponse>(searchThreadsQuery, {
       queryString,
       cursor: cursor ?? undefined,
       headers: {
