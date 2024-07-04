@@ -107,7 +107,7 @@ async function fetchThreads(octokit, owner, repo, token, rateLimitBuffer, cursor
             },
         });
         const fetchedItems = results.search.nodes;
-        core.debug(JSON.stringify(fetchedItems));
+        core.info(JSON.stringify(fetchedItems));
         allItems.push(...fetchedItems);
         // Check rate limit before continuing
         const rateLimitStatus = await checkRateLimit(octokit, 'graphql');
@@ -278,6 +278,7 @@ query ($queryString: String!, $cursor: String) {
           updatedAt
           closedAt
           locked
+          pullRequest
         }
         ... on PullRequest {
           number
@@ -285,6 +286,7 @@ query ($queryString: String!, $cursor: String) {
           updatedAt
           closedAt
           locked
+          pullRequest
         }
       }
     }

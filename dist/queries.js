@@ -15,6 +15,7 @@ query ($queryString: String!, $cursor: String) {
           updatedAt
           closedAt
           locked
+          pullRequest
         }
         ... on PullRequest {
           number
@@ -22,6 +23,7 @@ query ($queryString: String!, $cursor: String) {
           updatedAt
           closedAt
           locked
+          pullRequest
         }
       }
     }
