@@ -43,6 +43,10 @@ describe('GitHub Action - Rate Limit Handling', () => {
                     remaining: 5000,
                     reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
                   },
+                  graphql: {
+                    remaining: 5000,
+                    reset: Math.floor(Date.now() / 1000) + 3600,
+                  },
                 },
               },
             })
@@ -102,15 +106,17 @@ describe('GitHub Action - Rate Limit Handling', () => {
 
     // Ensure core.info was called with rate limit information
     expect(core.info).toHaveBeenCalledWith(
-      `Rate limit remaining: ${expectedRemaining}`,
+      `Rate limit core - remaining: ${expectedRemaining}`,
     )
     expect(core.info).toHaveBeenCalledWith(
-      `Rate limit resets at: ${new Date(expectedReset * 1000).toUTCString()}`,
+      `Rate limit core - resets at: ${new Date(expectedReset * 1000).toUTCString()}`,
     )
   })
 
   it('should fail and set failed status if rate limit check fails', async () => {
-    const mockGetRateLimit = jest.fn().mockRejectedValue(new Error('API error') as never)
+    const mockGetRateLimit = jest
+      .fn()
+      .mockRejectedValue(new Error('API error') as never)
 
     mockGithub.getOctokit.mockReturnValue({
       rest: {
@@ -123,8 +129,14 @@ describe('GitHub Action - Rate Limit Handling', () => {
     const result = await checkRateLimit(mockGithub.getOctokit('fake-token'))
 
     expect(mockGetRateLimit).toHaveBeenCalled()
-    expect(core.setFailed).toHaveBeenCalledWith('Failed to check rate limit: API error')
-    expect(result).toEqual({ remaining: 0, resetTime: 0, resetTimeHumanReadable: '' });
+    expect(core.setFailed).toHaveBeenCalledWith(
+      'Failed to check rate limit: API error',
+    )
+    expect(result).toEqual({
+      remaining: 0,
+      resetTime: 0,
+      resetTimeHumanReadable: '',
+    })
   })
 
   it('should warn and stop processing if initial rate limit is exceeded', async () => {
@@ -135,6 +147,10 @@ describe('GitHub Action - Rate Limit Handling', () => {
           core: {
             remaining: 50,
             reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
+          },
+          graphql: {
+            remaining: 5000,
+            reset: Math.floor(Date.now() / 1000) + 3600,
           },
         },
       },

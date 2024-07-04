@@ -1,13 +1,17 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { lockItem, fetchIssuesAndPRs } from '../src/index'
+import { graphql } from '@octokit/graphql'
+import { lockItem, fetchThreads, filterItems } from '../src/index'
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
+import { Thread } from '../src/interfaces'
 
 jest.mock('@actions/core')
 jest.mock('@actions/github')
+jest.mock('@octokit/graphql')
 
 const mockCore = core as jest.Mocked<typeof core>
 const mockGithub = github as jest.Mocked<typeof github>
+const mockGraphql = graphql as jest.MockedFunction<typeof graphql>
 
 describe('GitHub Action - Fetch & Lock', () => {
   let mockOctokit: any
@@ -29,9 +33,6 @@ describe('GitHub Action - Fetch & Lock', () => {
     // Mock Octokit instance with rate limit functionality
     mockOctokit = {
       rest: {
-        search: {
-          issuesAndPullRequests: jest.fn(),
-        },
         issues: {
           lock: jest.fn(),
         },
@@ -44,6 +45,10 @@ describe('GitHub Action - Fetch & Lock', () => {
                   core: {
                     remaining: 5000,
                     reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
+                  },
+                  graphql: {
+                    remaining: 5000,
+                    reset: Math.floor(Date.now() / 1000) + 3600,
                   },
                 },
               },
@@ -61,35 +66,44 @@ describe('GitHub Action - Fetch & Lock', () => {
       data: {
         resources: {
           core: {
-            remaining: 50, // Simulating rate limit under buffer after page 2
-            reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
+            remaining: 5000,
+            reset: Math.floor(Date.now() / 1000) + 3600,
+          },
+          graphql: {
+            remaining: 50,
+            reset: Math.floor(Date.now() / 1000) + 3600,
           },
         },
       },
     })
 
-    mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
-      data: {
-        items: [
+    mockGraphql.mockResolvedValueOnce({
+      search: {
+        nodes: [
           {
+            __typename: 'Issue',
             number: 1,
-            pull_request: false,
-            updated_at: '2023-05-01T00:00:00Z',
-          },
-          {
-            number: 2,
-            pull_request: false,
-            updated_at: '2023-05-01T00:00:00Z',
+            title: 'Issue 1',
+            updatedAt: '2023-06-30T00:00:00Z',
+            closedAt: '2023-06-30T00:00:00Z',
           },
         ],
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: null,
+        },
       },
     })
 
-    await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 100)
-
-    expect(mockOctokit.rest.search.issuesAndPullRequests).toHaveBeenCalledTimes(
-      1,
+    await fetchThreads(
+      mockOctokit,
+      'test-owner',
+      'test-repo',
+      'fake-token',
+      100,
     )
+
+    expect(mockGraphql).toHaveBeenCalledTimes(1)
 
     expect(core.warning).toHaveBeenCalledWith(
       'Rate limit exceeded, stopping further fetching. Please wait until Mon, 01 Jul 2024 01:00:00 GMT.',
@@ -97,79 +111,168 @@ describe('GitHub Action - Fetch & Lock', () => {
   })
 
   it('should fetch issues and PRs', async () => {
-    await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 100)
-    expect(mockOctokit.rest.search.issuesAndPullRequests).toHaveBeenCalledWith({
-      q: 'repo:test-owner/test-repo state:closed is:unlocked',
-      per_page: 100,
-      page: 1,
+    await fetchThreads(
+      mockOctokit,
+      'test-owner',
+      'test-repo',
+      'fake-token',
+      100,
+    )
+    expect(mockGraphql).toHaveBeenCalledWith(expect.any(String), {
+      cursor: undefined,
+      headers: {
+        authorization: 'token fake-token',
+      },
+      queryString: 'repo:test-owner/test-repo state:closed is:unlocked',
     })
   })
 
-  it('should continue fetching issues and PRs if there are more pages', async () => {
+  it('should continue fetching threads if there are more', async () => {
     const mockItemsPage1 = Array.from({ length: 100 }, (_, i) => ({
       number: i + 1,
-      pull_request: false,
       updated_at: new Date('2023-05-01T00:00:00Z').toISOString(),
     }))
     const mockItemsPage2 = Array.from({ length: 90 }, (_, i) => ({
       number: 100 + i + 1,
-      pull_request: false,
       updated_at: new Date('2023-05-01T00:00:00Z').toISOString(),
     }))
 
-    mockOctokit.rest.search.issuesAndPullRequests
-      .mockResolvedValueOnce({ data: { items: mockItemsPage1 } })
-      .mockResolvedValueOnce({ data: { items: mockItemsPage2 } })
+    mockGraphql
+      .mockResolvedValueOnce({
+        search: {
+          nodes: mockItemsPage1,
+          pageInfo: {
+            hasNextPage: true,
+            endCursor: 'cursor-1',
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        search: {
+          nodes: mockItemsPage2,
+          pageInfo: {
+            hasNextPage: false,
+            endCursor: null,
+          },
+        },
+      })
 
-    const result = await fetchIssuesAndPRs(
+    const result = await fetchThreads(
       mockOctokit,
       'test-owner',
       'test-repo',
-      100,
+      'fake-token',
       100,
     )
 
-    expect(mockOctokit.rest.search.issuesAndPullRequests).toHaveBeenCalledTimes(
-      2,
-    )
+    expect(mockGraphql).toHaveBeenCalledTimes(2)
     expect(result.length).toBe(190)
   })
 
   it('should handle errors during fetching issues and PRs', async () => {
-    mockOctokit.rest.search.issuesAndPullRequests.mockRejectedValueOnce(
-      new Error('API error'),
-    )
+    mockGraphql.mockRejectedValueOnce(new Error('API error'))
 
-    const result = await fetchIssuesAndPRs(
+    const result = await fetchThreads(
       mockOctokit,
       'test-owner',
       'test-repo',
-      100,
+      'fake-token',
       100,
     )
 
     expect(core.setFailed).toHaveBeenCalledWith(
-      'Failed to fetch issues and PRs: API error',
+      'Failed to fetch issues and PRs using GraphQL: API error',
     )
     expect(result).toEqual([])
   })
 
   it('should handle errors during closing issues and PRs', async () => {
-    const mockItems = [
-      { number: 1, title: 'Issue 1', updated_at: '2023-06-30T00:00:00Z' },
+    const mockItems: Thread[] = [
+      {
+        __typename: 'Issue',
+        number: 1,
+        title: 'Issue 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
+        number: 2,
+        title: 'PR 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
     ]
 
-    mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
-      data: { items: mockItems },
+    mockGraphql.mockResolvedValueOnce({
+      search: {
+        nodes: mockItems,
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: null,
+        },
+      },
     })
 
     mockOctokit.rest.issues.lock.mockRejectedValueOnce(new Error('API error'))
 
-    await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 100)
+    await fetchThreads(
+      mockOctokit,
+      'test-owner',
+      'test-repo',
+      'fake-token',
+      100,
+    )
     await lockItem(mockOctokit, 'test-owner', 'test-repo', 1, 'off-topic')
 
     expect(core.setFailed).toHaveBeenCalledWith(
       'Failed to lock issue/PR #1: API error',
     )
+  })
+
+  it('should correctly filter issues and pull requests', () => {
+    const mockItems: Thread[] = [
+      {
+        __typename: 'Issue',
+        number: 1,
+        title: 'Issue 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
+        number: 2,
+        title: 'PR 1',
+        updatedAt: '2024-06-30T00:00:00Z',
+        closedAt: '2024-06-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'Issue',
+        number: 3,
+        title: 'Issue 2',
+        updatedAt: '2024-05-30T00:00:00Z',
+        closedAt: '2024-05-30T00:00:00Z',
+        locked: false,
+      },
+      {
+        __typename: 'PullRequest',
+        number: 4,
+        title: 'PR 2',
+        updatedAt: '2024-05-30T00:00:00Z',
+        closedAt: '2024-05-30T00:00:00Z',
+        locked: false,
+      }
+    ]
+
+    // Act
+    const { issuesList, pullRequestsList } = filterItems(mockItems)
+
+    // Assert
+    expect(issuesList.length).toBe(2)
+    expect(pullRequestsList.length).toBe(2)
   })
 })
