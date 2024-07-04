@@ -20,12 +20,12 @@ export interface RateLimitStatus {
  * @property pull_request Thread pull request.
  */
 export interface Thread {
+  __typename: 'Issue' | 'PullRequest';
   number: number
   title: string
   updatedAt: string
   closedAt: string
   locked: boolean
-  pull_request?: any
 }
 
 /**

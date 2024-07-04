@@ -10,20 +10,20 @@ query ($queryString: String!, $cursor: String) {
       }
       nodes {
         ... on Issue {
+          __typename
           number
           title
           updatedAt
           closedAt
           locked
-          pullRequest
         }
         ... on PullRequest {
+          __typename
           number
           title
           updatedAt
           closedAt
           locked
-          pullRequest
         }
       }
     }

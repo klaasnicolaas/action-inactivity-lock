@@ -62,8 +62,8 @@ async function run() {
             core.info('Sufficient rate limit available, starting processing.');
             // Fetch all relevant issues and PRs
             const items = await fetchThreads(octokit, owner, repo, token, rateLimitBuffer);
-            const issuesList = items.filter((item) => !item.pull_request);
-            const pullRequestsList = items.filter((item) => item.pull_request);
+            const issuesList = items.filter(item => item.__typename === 'Issue');
+            const pullRequestsList = items.filter(item => item.__typename === 'PullRequest');
             // Process issues and PRs in parallel
             await Promise.all([
                 processIssues(octokit, owner, repo, issuesList, daysInactiveIssues, lockReasonIssues),
@@ -273,20 +273,20 @@ query ($queryString: String!, $cursor: String) {
       }
       nodes {
         ... on Issue {
+          __typename
           number
           title
           updatedAt
           closedAt
           locked
-          pullRequest
         }
         ... on PullRequest {
+          __typename
           number
           title
           updatedAt
           closedAt
           locked
-          pullRequest
         }
       }
     }
