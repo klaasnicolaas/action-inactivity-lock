@@ -25,9 +25,7 @@ export interface Thread {
   updatedAt: string
   closedAt: string
   locked: boolean
-  pull_request?: {
-    url: string
-  } | null
+  pull_request?: any
 }
 
 /**

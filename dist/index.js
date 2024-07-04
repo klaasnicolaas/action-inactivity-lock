@@ -107,6 +107,7 @@ async function fetchThreads(octokit, owner, repo, token, rateLimitBuffer, cursor
             },
         });
         const fetchedItems = results.search.nodes;
+        core.debug(JSON.stringify(fetchedItems));
         allItems.push(...fetchedItems);
         // Check rate limit before continuing
         const rateLimitStatus = await checkRateLimit(octokit, 'graphql');

@@ -114,6 +114,7 @@ export async function fetchThreads(
     })
 
     const fetchedItems = results.search.nodes
+    core.debug(JSON.stringify(fetchedItems))
     allItems.push(...fetchedItems)
 
     // Check rate limit before continuing
