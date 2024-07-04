@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { processIssues } from '../src/index'
+import { processIssues, fetchIssuesAndPRs } from '../src/index'
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
 
 jest.mock('@actions/core')
@@ -11,9 +11,11 @@ const mockGithub = github as jest.Mocked<typeof github>
 
 describe('GitHub Action - Lock issues', () => {
   let mockOctokit: any
+  const currentDate = new Date('2024-07-01T00:00:00Z')
 
   beforeEach(() => {
     jest.clearAllMocks()
+    jest.useFakeTimers().setSystemTime(currentDate)
 
     // Mock context.repo using Object.defineProperty
     Object.defineProperty(mockGithub.context, 'repo', {
@@ -27,8 +29,10 @@ describe('GitHub Action - Lock issues', () => {
     // Mock Octokit instance with rate limit functionality
     mockOctokit = {
       rest: {
+        search: {
+          issuesAndPullRequests: jest.fn(),
+        },
         issues: {
-          listForRepo: jest.fn(),
           lock: jest.fn(),
         },
         rateLimit: {
@@ -52,277 +56,107 @@ describe('GitHub Action - Lock issues', () => {
     mockGithub.getOctokit.mockReturnValue(mockOctokit)
   })
 
-  it('should process closed issues and lock inactive ones', async () => {
+  it('should process closed issues and lock inactive ones (with custom reason)', async () => {
     mockCore.getInput.mockImplementation((name) => {
       if (name === 'repo-token') return 'fake-token'
       if (name === 'days-inactive-issues') return '30'
-      if (name === 'lock-reason-issues') return ''
+      if (name === 'lock-reason-issues') return 'off-topic'
       return ''
     })
 
-    // Mock response for listForRepo
-    mockOctokit.rest.issues.listForRepo.mockImplementation(
-      async ({ owner, repo, state, per_page, page }) => {
-        // Simulate fetching issues
-        if (page === 1) {
-          return {
-            data: [
-              {
-                number: 1,
-                title: 'Test issue',
-                pull_request: null,
-                updated_at: '2023-06-29T12:00:00Z', // Assuming this issue is inactive
-              },
-            ],
-          }
-        } else {
-          return {
-            data: [], // Simulate no more issues on subsequent pages
-          }
-        }
-      },
-    )
+    const mockItems = [
+      { number: 1, title: 'Issue 1', updated_at: "2024-06-30T00:00:00Z" }, // Active issue
+      { number: 2, title: 'Issue 2', updated_at: "2024-06-30T00:00:00Z" }, // Active issue
+      {
+        number: 3,
+        title: 'Issue 3',
+        updated_at: new Date(
+          Date.now() - 31 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+      }, // Inactive issue
+    ]
 
-    // @ts-ignore - Ignore missing properties
-    const mockLock = jest.fn().mockResolvedValue({})
-    const lockedIssues: { number: number; title: string }[] = []
-    mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
+    mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+      data: { items: mockItems },
+    })
 
+    const mockSetOutput = jest.spyOn(core, 'setOutput')
+    const mockInfo = jest.spyOn(core, 'info')
+
+    // Run the action
+    await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 10)
     await processIssues(
       mockOctokit,
       'test-owner',
       'test-repo',
+      mockItems,
       30,
-      undefined,
-      100,
-      100,
-      lockedIssues,
+      'off-topic',
     )
 
-    expect(mockOctokit.rest.issues.listForRepo).toHaveBeenCalledWith({
-      owner: 'test-owner',
-      repo: 'test-repo',
-      state: 'closed',
-      per_page: 100,
-      page: 1,
-    })
-
+    // Assert locking function calls
+    expect(mockOctokit.rest.issues.lock).toHaveBeenCalledTimes(1)
     expect(mockOctokit.rest.issues.lock).toHaveBeenCalledWith({
       owner: 'test-owner',
       repo: 'test-repo',
-      issue_number: 1,
+      issue_number: 3,
+      lock_reason: 'off-topic',
     })
 
-    expect(mockCore.info).toHaveBeenCalledWith(
-      'Locked issue #1 due to 30 days of inactivity.',
+    // Assert info message
+    expect(mockInfo).toHaveBeenCalledWith(
+      'Locked issue #3 due to 30 days of inactivity.',
     )
 
-    // Ensure lockedIssues array is updated correctly
-    expect(lockedIssues).toEqual([{ number: 1, title: 'Test issue' }])
-
-    // Ensure output is set correctly
-    expect(mockCore.setOutput).toHaveBeenCalledWith(
+    // Assert setOutput called with locked issues
+    expect(mockSetOutput).toHaveBeenCalledWith(
       'locked-issues',
-      JSON.stringify([{ number: 1, title: 'Test issue' }]),
+      JSON.stringify([{ number: 3, title: 'Issue 3' }]),
     )
-  })
-
-  it('should process multiple pages of closed issues', async () => {
-    mockCore.getInput.mockImplementation((name) => {
-      if (name === 'repo-token') return 'fake-token'
-      if (name === 'days-inactive-issues') return '30'
-      if (name === 'lock-reason-issues') return 'off-topic'
-      return ''
-    })
-
-    // Mock response for listForRepo
-    mockOctokit.rest.issues.listForRepo.mockImplementation(
-      async ({ owner, repo, state, per_page, page }) => {
-        // Simulate fetching issues
-        if (page === 1) {
-          return {
-            data: Array(per_page).fill({
-              number: 1,
-              title: 'Test issue',
-              pull_request: null,
-              updated_at: '2023-06-29T12:00:00Z', // Assuming this issue is inactive
-            }),
-          }
-        } else if (page === 2) {
-          return {
-            data: [], // Simulate no more issues on subsequent pages
-          }
-        }
-      },
-    )
-
-    // @ts-ignore - Ignore missing properties
-    const mockLock = jest.fn().mockResolvedValue({})
-    const lockedIssues: { number: number; title: string }[] = []
-    mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
-
-    await processIssues(
-      mockOctokit,
-      'test-owner',
-      'test-repo',
-      30,
-      'off-topic',
-      100,
-      100,
-      lockedIssues,
-    )
-
-    // Ensure listForRepo was called correctly
-    expect(mockOctokit.rest.issues.listForRepo).toHaveBeenCalledWith({
-      owner: 'test-owner',
-      repo: 'test-repo',
-      state: 'closed',
-      per_page: 100,
-      page: 1,
-    })
-  })
-
-  it('should not lock issues that are already locked', async () => {
-    mockCore.getInput.mockImplementation((name) => {
-      if (name === 'repo-token') return 'fake-token'
-      if (name === 'days-inactive-issues') return '30'
-      if (name === 'lock-reason-issues') return 'off-topic'
-      return ''
-    })
-
-    // Mock response for listForRepo
-    mockOctokit.rest.issues.listForRepo.mockImplementation(
-      async ({ owner, repo, state, per_page, page }) => {
-        // Simulate fetching issues
-        if (page === 1) {
-          return {
-            data: [
-              {
-                number: 1,
-                title: 'Test issue',
-                pull_request: null,
-                locked: true, // Issue is already locked
-                updated_at: '2023-06-29T12:00:00Z',
-              },
-            ],
-          }
-        } else {
-          return {
-            data: [], // Simulate no more issues on subsequent pages
-          }
-        }
-      },
-    )
-
-    // @ts-ignore - Ignore missing properties
-    const mockLock = jest.fn().mockResolvedValue({})
-    const lockedIssues: { number: number; title: string }[] = []
-    mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
-
-    await processIssues(
-      mockOctokit,
-      'test-owner',
-      'test-repo',
-      30,
-      'off-topic',
-      100,
-      100,
-      lockedIssues,
-    )
-
-    expect(mockOctokit.rest.issues.lock).not.toHaveBeenCalled()
-    expect(core.debug).toHaveBeenCalledWith('Issue #1 is already locked.')
   })
 
   it('should not lock issues that are less than 30 days inactive', async () => {
     mockCore.getInput.mockImplementation((name) => {
       if (name === 'repo-token') return 'fake-token'
       if (name === 'days-inactive-issues') return '30'
-      if (name === 'lock-reason-issues') return 'off-topic'
       return ''
     })
 
-    // Mock response for listForRepo
-    mockOctokit.rest.issues.listForRepo.mockImplementation(
-      async ({ owner, repo, state, per_page, page }) => {
-        // Simulate fetching issues
-        if (page === 1) {
-          return {
-            data: [
-              {
-                number: 1,
-                pull_request: null,
-                updated_at: new Date().toISOString(), // Date is current
-              },
-            ],
-          }
-        } else {
-          return {
-            data: [], // Simulate no more issues on subsequent pages
-          }
-        }
-      },
-    )
+    const mockItems = [
+      { number: 1, closed: true, updated_at: "2024-06-30T00:00:00Z" }, // Active issue
+      { number: 2, closed: true, updated_at: "2024-06-30T00:00:00Z" }, // Active issue
+    ]
 
-    // @ts-ignore - Ignore missing properties
-    const mockLock = jest.fn().mockResolvedValue({})
-    mockOctokit.rest.issues.lock.mockImplementationOnce(mockLock)
+    mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+      data: { items: mockItems },
+    })
 
+    // Mock setOutput
+    const mockSetOutput = jest.spyOn(core, 'setOutput')
+
+    // Run the action
+    await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 10)
     await processIssues(
       mockOctokit,
       'test-owner',
       'test-repo',
+      mockItems,
       30,
-      'off-topic',
-      100,
-      100,
+      'resolved',
     )
 
-    expect(mockOctokit.rest.issues.listForRepo).toHaveBeenCalledWith({
-      owner: 'test-owner',
-      repo: 'test-repo',
-      state: 'closed',
-      per_page: 100,
-      page: 1,
-    })
-
-    expect(mockLock).not.toHaveBeenCalled() // Ensure lock function is not called
-  })
-
-  it('should warn when rate limit is exceeded during issue locking', async () => {
-    // Set remaining rate limit to 0 to simulate rate limit exceeded
-    mockOctokit.rest.rateLimit.get.mockResolvedValueOnce({
-      data: {
-        resources: {
-          core: {
-            remaining: 0,
-            reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
-          },
-        },
-      },
-    })
-
-    mockCore.getInput.mockImplementation((name) => {
-      if (name === 'repo-token') return 'fake-token'
-      if (name === 'days-inactive-issues') return '30'
-      if (name === 'lock-reason-issues') return 'off-topic'
-      return ''
-    })
-
-    await processIssues(
-      mockOctokit,
-      'test-owner',
-      'test-repo',
-      30,
-      'off-topic',
-      100,
-      100,
+    // Assert debug messages
+    expect(core.debug).toHaveBeenCalledWith(
+      'Issue #1 has only 1 days of inactivity.',
     )
 
-    expect(mockCore.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Rate limit exceeded'),
-    )
-    expect(mockOctokit.rest.issues.listForRepo).not.toHaveBeenCalled()
+    // Assert no locking function call
     expect(mockOctokit.rest.issues.lock).not.toHaveBeenCalled()
+
+    // Assert setOutput not called for locked issues
+    expect(mockSetOutput).toHaveBeenCalledWith(
+      'locked-issues',
+      JSON.stringify([]),
+    )
   })
 })

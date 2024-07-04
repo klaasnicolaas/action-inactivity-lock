@@ -27,12 +27,11 @@ describe('GitHub Action - Rate Limit Handling', () => {
     // Mock Octokit instance with rate limit functionality
     mockOctokit = {
       rest: {
-        issues: {
-          listForRepo: jest.fn(),
-          lock: jest.fn(),
+        search: {
+          issuesAndPullRequests: jest.fn(),
         },
-        pulls: {
-          list: jest.fn(),
+        issues: {
+          lock: jest.fn(),
         },
         rateLimit: {
           get: jest.fn().mockImplementation(() => {
@@ -156,78 +155,5 @@ describe('GitHub Action - Rate Limit Handling', () => {
     expect(mockCore.warning).toHaveBeenCalledWith(
       'Initial rate limit too low, stopping processing.',
     )
-  })
-
-  it('should process issues and pull requests if rate limit allows', async () => {
-    // Set remaining rate limit to 100 to simulate enough remaining calls
-    mockOctokit.rest.rateLimit.get.mockResolvedValueOnce({
-      data: {
-        resources: {
-          core: {
-            remaining: 200,
-            reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
-          },
-        },
-      },
-    })
-
-    mockCore.getInput.mockImplementation((name) => {
-      if (name === 'repo-token') return 'fake-token'
-      if (name === 'rate-limit-buffer') return '100'
-      if (name === 'days-inactive-issues') return '30'
-      if (name === 'days-inactive-prs') return '30'
-      if (name === 'lock-reason-issues') return 'off-topic'
-      if (name === 'lock-reason-prs') return 'off-topic'
-      return ''
-    })
-
-    // Mock response for listForRepo
-    mockOctokit.rest.issues.listForRepo.mockImplementation(
-      async ({ owner, repo, state, per_page, page }) => {
-        // Simulate fetching issues
-        if (page === 1) {
-          return {
-            data: [
-              {
-                number: 1,
-                pull_request: null,
-                updated_at: '2023-06-29T12:00:00Z', // Assuming this issue is inactive
-              },
-            ],
-          }
-        } else {
-          return {
-            data: [], // Simulate no more issues on subsequent pages
-          }
-        }
-      },
-    )
-
-    // Mock response for list
-    mockOctokit.rest.pulls.list.mockImplementation(
-      async ({ owner, repo, state, per_page, page }) => {
-        // Simulate fetching PRs
-        if (page === 1) {
-          return {
-            data: [
-              {
-                number: 1,
-                updated_at: '2023-05-29T12:00:00Z', // Assuming this issue is inactive
-              },
-            ],
-          }
-        } else {
-          return {
-            data: [], // Simulate no more PRs on subsequent pages
-          }
-        }
-      },
-    )
-
-    await run()
-
-    // Ensure processing functions were called
-    expect(mockOctokit.rest.issues.listForRepo).toHaveBeenCalled()
-    expect(mockOctokit.rest.pulls.list).toHaveBeenCalled()
   })
 })
