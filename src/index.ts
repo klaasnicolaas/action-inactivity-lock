@@ -47,7 +47,7 @@ export async function run(): Promise<void> {
     core.info('Starting processing of issues and pull requests.')
     core.info('Checking rate limit before processing.')
 
-    const rateLimitStatus = (await checkRateLimit(octokit)) as RateLimitStatus
+    const rateLimitStatus = await checkRateLimit(octokit)
     if (rateLimitStatus.remaining > rateLimitBuffer) {
       core.info('Sufficient rate limit available, starting processing.')
 
@@ -85,9 +85,8 @@ export async function run(): Promise<void> {
       // Check rate limit after processing
       await checkRateLimit(octokit)
       core.info('Processing completed.')
-    } else {
-      core.warning('Initial rate limit too low, stopping processing.')
     }
+    core.warning('Initial rate limit too low, stopping processing.')
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(`Action failed with error: ${error.message}`)
@@ -119,15 +118,6 @@ export async function fetchIssuesAndPRs(
   core.info(`Fetching issues and PRs on page ${page}`)
 
   try {
-    // Check rate limit before fetching
-    const rateLimitStatus = await checkRateLimit(octokit)
-    if (rateLimitStatus.remaining <= rateLimitBuffer) {
-      core.warning(
-        `Rate limit exceeded, stopping further fetching. Please wait until ${rateLimitStatus.resetTimeHumanReadable}.`,
-      )
-      return allItems
-    }
-
     const query = `repo:${owner}/${repo} state:closed is:unlocked`
     const results = await octokit.rest.search.issuesAndPullRequests({
       q: query,
@@ -137,6 +127,15 @@ export async function fetchIssuesAndPRs(
 
     const fetchedItems = results.data.items
     allItems.push(...results.data.items)
+
+    // Check rate limit before continuing
+    const rateLimitStatus = await checkRateLimit(octokit)
+    if (rateLimitStatus.remaining <= rateLimitBuffer) {
+      core.warning(
+        `Rate limit exceeded, stopping further fetching. Please wait until ${rateLimitStatus.resetTimeHumanReadable}.`,
+      )
+      return allItems
+    }
 
     if (fetchedItems.length === perPage) {
       // Fetch next batch

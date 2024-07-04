@@ -56,7 +56,7 @@ async function run() {
         const perPage = 100; // Batch size for processing
         core.info('Starting processing of issues and pull requests.');
         core.info('Checking rate limit before processing.');
-        const rateLimitStatus = (await checkRateLimit(octokit));
+        const rateLimitStatus = await checkRateLimit(octokit);
         if (rateLimitStatus.remaining > rateLimitBuffer) {
             core.info('Sufficient rate limit available, starting processing.');
             // Fetch all relevant issues and PRs
@@ -72,9 +72,7 @@ async function run() {
             await checkRateLimit(octokit);
             core.info('Processing completed.');
         }
-        else {
-            core.warning('Initial rate limit too low, stopping processing.');
-        }
+        core.warning('Initial rate limit too low, stopping processing.');
     }
     catch (error) {
         if (error instanceof Error) {
@@ -97,12 +95,6 @@ async function run() {
 async function fetchIssuesAndPRs(octokit, owner, repo, perPage, rateLimitBuffer, page = 1, allItems = []) {
     core.info(`Fetching issues and PRs on page ${page}`);
     try {
-        // Check rate limit before fetching
-        const rateLimitStatus = await checkRateLimit(octokit);
-        if (rateLimitStatus.remaining <= rateLimitBuffer) {
-            core.warning(`Rate limit exceeded, stopping further fetching. Please wait until ${rateLimitStatus.resetTimeHumanReadable}.`);
-            return allItems;
-        }
         const query = `repo:${owner}/${repo} state:closed is:unlocked`;
         const results = await octokit.rest.search.issuesAndPullRequests({
             q: query,
@@ -111,6 +103,12 @@ async function fetchIssuesAndPRs(octokit, owner, repo, perPage, rateLimitBuffer,
         });
         const fetchedItems = results.data.items;
         allItems.push(...results.data.items);
+        // Check rate limit before continuing
+        const rateLimitStatus = await checkRateLimit(octokit);
+        if (rateLimitStatus.remaining <= rateLimitBuffer) {
+            core.warning(`Rate limit exceeded, stopping further fetching. Please wait until ${rateLimitStatus.resetTimeHumanReadable}.`);
+            return allItems;
+        }
         if (fetchedItems.length === perPage) {
             // Fetch next batch
             return fetchIssuesAndPRs(octokit, owner, repo, perPage, rateLimitBuffer, page + 1, allItems);

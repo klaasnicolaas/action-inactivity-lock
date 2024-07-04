@@ -1,9 +1,6 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import {
-  lockItem,
-  fetchIssuesAndPRs,
-} from '../src/index'
+import { lockItem, fetchIssuesAndPRs } from '../src/index'
 import { describe, expect, it, jest, beforeEach } from '@jest/globals'
 
 jest.mock('@actions/core')
@@ -64,14 +61,36 @@ describe('GitHub Action - Fetch & Lock', () => {
       data: {
         resources: {
           core: {
-            remaining: 50,
+            remaining: 50, // Simulating rate limit under buffer after page 2
             reset: Math.floor(Date.now() / 1000) + 3600, // Reset time in future
           },
         },
       },
     })
 
+    mockOctokit.rest.search.issuesAndPullRequests.mockResolvedValueOnce({
+      data: {
+        items: [
+          {
+            number: 1,
+            pull_request: false,
+            updated_at: '2023-05-01T00:00:00Z',
+          },
+          {
+            number: 2,
+            pull_request: false,
+            updated_at: '2023-05-01T00:00:00Z',
+          },
+        ],
+      },
+    })
+
     await fetchIssuesAndPRs(mockOctokit, 'test-owner', 'test-repo', 100, 100)
+
+    expect(mockOctokit.rest.search.issuesAndPullRequests).toHaveBeenCalledTimes(
+      1,
+    )
+
     expect(core.warning).toHaveBeenCalledWith(
       'Rate limit exceeded, stopping further fetching. Please wait until Mon, 01 Jul 2024 01:00:00 GMT.',
     )
