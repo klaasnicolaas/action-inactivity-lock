@@ -145,8 +145,8 @@ jobs:
           lock-reason-prs: "resolved"
       - name: 🔍 Display locked issues and PRs
         run: |
-          echo "Locked issues: ${{ steps.lock.outputs.locked-issues }}"
-          echo "Locked PRs: ${{ steps.lock.outputs.locked-prs }}"
+          echo "Locked issues: $(echo '${{ steps.lock.outputs.locked-issues }}' | jq)"
+          echo "Locked PRs: $(echo '${{ steps.lock.outputs.locked-prs }}' | jq)"
 ```
 
 ## Contributing
