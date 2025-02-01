@@ -167,7 +167,7 @@ Distributed under the **Apache License 2.0** license. See [`LICENSE`](LICENSE) f
 [codecov-shield]: https://codecov.io/gh/klaasnicolaas/action-inactivity-lock/branch/main/graph/badge.svg?token=FJXBX4ZTI1
 [codecov-url]: https://codecov.io/gh/klaasnicolaas/action-inactivity-lock
 [license-shield]: https://img.shields.io/github/license/klaasnicolaas/action-inactivity-lock.svg
-[maintenance-shield]: https://img.shields.io/maintenance/yes/2024.svg
+[maintenance-shield]: https://img.shields.io/maintenance/yes/5.svg
 [project-stage-shield]: https://img.shields.io/badge/project%20stage-production%20ready-brightgreen.svg
 [releases-shield]: https://img.shields.io/github/release/klaasnicolaas/action-inactivity-lock.svg
 [releases]: https://github.com/klaasnicolaas/action-inactivity-lock/releases
