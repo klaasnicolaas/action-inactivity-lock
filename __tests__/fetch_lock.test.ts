@@ -1,25 +1,25 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { graphql } from '@octokit/graphql'
-import { lockItem, fetchThreads, filterItems } from '../src/index'
-import { describe, expect, it, jest, beforeEach } from '@jest/globals'
-import { Thread } from '../src/interfaces'
+import { lockItem, fetchThreads, filterItems } from '../src/index.js'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { Thread } from '../src/interfaces.js'
 
-jest.mock('@actions/core')
-jest.mock('@actions/github')
-jest.mock('@octokit/graphql')
+vi.mock('@actions/core')
+vi.mock('@actions/github')
+vi.mock('@octokit/graphql')
 
-const mockCore = core as jest.Mocked<typeof core>
-const mockGithub = github as jest.Mocked<typeof github>
-const mockGraphql = graphql as jest.MockedFunction<typeof graphql>
+const mockCore = core as vi.Mocked<typeof core>
+const mockGithub = github as vi.Mocked<typeof github>
+const mockGraphql = graphql as vi.MockedFunction<typeof graphql>
 
 describe('GitHub Action - Fetch & Lock', () => {
   let mockOctokit: any
   const currentDate = new Date('2024-07-01T00:00:00Z')
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    jest.useFakeTimers().setSystemTime(currentDate)
+    vi.clearAllMocks()
+    vi.useFakeTimers().setSystemTime(currentDate)
 
     // Mock context.repo using Object.defineProperty
     Object.defineProperty(mockGithub.context, 'repo', {
@@ -34,10 +34,10 @@ describe('GitHub Action - Fetch & Lock', () => {
     mockOctokit = {
       rest: {
         issues: {
-          lock: jest.fn(),
+          lock: vi.fn(),
         },
         rateLimit: {
-          get: jest.fn().mockImplementation(() => {
+          get: vi.fn().mockImplementation(() => {
             // Default mock response for rate limit
             return Promise.resolve({
               data: {

@@ -1,19 +1,19 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { run, checkRateLimit } from '../src/index'
-import { describe, expect, it, jest, beforeEach } from '@jest/globals'
+import { run, checkRateLimit } from '../src/index.js'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-jest.mock('@actions/core')
-jest.mock('@actions/github')
+vi.mock('@actions/core')
+vi.mock('@actions/github')
 
-const mockCore = core as jest.Mocked<typeof core>
-const mockGithub = github as jest.Mocked<typeof github>
+const mockCore = core as vi.Mocked<typeof core>
+const mockGithub = github as vi.Mocked<typeof github>
 
 describe('GitHub Action - Rate Limit Handling', () => {
   let mockOctokit: any
 
   beforeEach(() => {
-    jest.clearAllMocks()
+    vi.clearAllMocks()
 
     // Mock context.repo using Object.defineProperty
     Object.defineProperty(mockGithub.context, 'repo', {
@@ -28,13 +28,13 @@ describe('GitHub Action - Rate Limit Handling', () => {
     mockOctokit = {
       rest: {
         search: {
-          issuesAndPullRequests: jest.fn(),
+          issuesAndPullRequests: vi.fn(),
         },
         issues: {
-          lock: jest.fn(),
+          lock: vi.fn(),
         },
         rateLimit: {
-          get: jest.fn().mockImplementation(() => {
+          get: vi.fn().mockImplementation(() => {
             // Default mock response for rate limit
             return Promise.resolve({
               data: {
@@ -74,7 +74,7 @@ describe('GitHub Action - Rate Limit Handling', () => {
       mockRateLimitResponse.data.resources.core.remaining
     const expectedReset = mockRateLimitResponse.data.resources.core.reset
 
-    const mockGetRateLimit = jest.fn().mockResolvedValue(mockRateLimitResponse)
+    const mockGetRateLimit = vi.fn().mockResolvedValue(mockRateLimitResponse)
 
     mockGithub.getOctokit.mockReturnValue({
       rest: {
@@ -114,7 +114,7 @@ describe('GitHub Action - Rate Limit Handling', () => {
   })
 
   it('should fail and set failed status if rate limit check fails', async () => {
-    const mockGetRateLimit = jest
+    const mockGetRateLimit = vi
       .fn()
       .mockRejectedValue(new Error('API error') as never)
 
