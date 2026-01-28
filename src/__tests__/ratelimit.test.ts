@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { run, checkRateLimit } from '../src/index.js'
+import { run, checkRateLimit } from '../index.js'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 vi.mock('@actions/core')

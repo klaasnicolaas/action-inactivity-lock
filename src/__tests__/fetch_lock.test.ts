@@ -1,9 +1,9 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { graphql } from '@octokit/graphql'
-import { lockItem, fetchThreads, filterItems } from '../src/index.js'
+import { lockItem, fetchThreads, filterItems } from '../index.js'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { Thread } from '../src/interfaces.js'
+import { Thread } from '../interfaces.js'
 
 vi.mock('@actions/core')
 vi.mock('@actions/github')
@@ -265,7 +265,7 @@ describe('GitHub Action - Fetch & Lock', () => {
         updatedAt: '2024-05-30T00:00:00Z',
         closedAt: '2024-05-30T00:00:00Z',
         locked: false,
-      }
+      },
     ]
 
     // Act
