@@ -265,7 +265,7 @@ describe('GitHub Action - Fetch & Lock', () => {
         updatedAt: '2024-05-30T00:00:00Z',
         closedAt: '2024-05-30T00:00:00Z',
         locked: false,
-      }
+      },
     ]
 
     // Act
