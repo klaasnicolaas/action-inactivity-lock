@@ -1,9 +1,9 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import { graphql } from '@octokit/graphql'
-import { processPullRequests, fetchThreads } from '../src/index.js'
+import { processPullRequests, fetchThreads } from '../index.js'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { Thread } from '../src/interfaces.js'
+import { Thread } from '../interfaces.js'
 
 vi.mock('@actions/core')
 vi.mock('@actions/github')
