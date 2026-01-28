@@ -350,5 +350,7 @@ export async function checkRateLimit(
   }
 }
 
-// Run the action
-run()
+// Run the action only if this is the main module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  run()
+}

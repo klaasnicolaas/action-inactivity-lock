@@ -1,42 +1,39 @@
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import { run } from '../src/index'
-import { describe, expect, it, jest, beforeEach } from '@jest/globals'
+import { run } from '../src/index.js'
 
-jest.mock('@actions/core')
-jest.mock('@actions/github')
-
-const mockCore = core as jest.Mocked<typeof core>
-const mockGithub = github as jest.Mocked<typeof github>
+vi.mock('@actions/core')
+vi.mock('@actions/github', () => ({
+  context: {
+    repo: {
+      owner: 'test-owner',
+      repo: 'test-repo',
+    },
+  },
+  getOctokit: vi.fn(),
+}))
 
 describe('GitHub Action - Run', () => {
   let mockOctokit: any
   const currentDate = new Date('2023-07-01T00:00:00Z')
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    jest.useFakeTimers().setSystemTime(currentDate)
-
-    // Mock context.repo using Object.defineProperty
-    Object.defineProperty(mockGithub.context, 'repo', {
-      value: {
-        owner: 'test-owner',
-        repo: 'test-repo',
-      },
-      writable: true, // Ensure it can be modified
-    })
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(currentDate)
 
     // Mock Octokit instance with rate limit functionality
     mockOctokit = {
       rest: {
         search: {
-          issuesAndPullRequests: jest.fn(),
+          issuesAndPullRequests: vi.fn(),
         },
         issues: {
-          lock: jest.fn(),
+          lock: vi.fn(),
         },
         rateLimit: {
-          get: jest.fn().mockImplementation(() => {
+          get: vi.fn().mockImplementation(() => {
             // Default mock response for rate limit
             return Promise.resolve({
               data: {
@@ -57,11 +54,11 @@ describe('GitHub Action - Run', () => {
       },
     }
 
-    mockGithub.getOctokit.mockReturnValue(mockOctokit)
+    vi.mocked(github.getOctokit).mockReturnValue(mockOctokit)
   })
 
   it('should get all necessary action inputs', async () => {
-    mockCore.getInput.mockImplementation((name) => {
+    vi.mocked(core.getInput).mockImplementation((name) => {
       if (name === 'repo-token') return 'fake-token'
       if (name === 'rate-limit-buffer') return '100'
       if (name === 'days-inactive-issues') return '30'
@@ -73,14 +70,14 @@ describe('GitHub Action - Run', () => {
 
     await run()
 
-    expect(mockCore.getInput).toHaveBeenCalledWith('repo-token')
-    expect(mockCore.getInput).toHaveBeenCalledWith('rate-limit-buffer')
-    expect(mockCore.getInput).toHaveBeenCalledWith('days-inactive-issues')
-    expect(mockCore.getInput).toHaveBeenCalledWith('days-inactive-prs')
-    expect(mockCore.getInput).toHaveBeenCalledWith('lock-reason-issues')
-    expect(mockCore.getInput).toHaveBeenCalledWith('lock-reason-prs')
+    expect(core.getInput).toHaveBeenCalledWith('repo-token')
+    expect(core.getInput).toHaveBeenCalledWith('rate-limit-buffer')
+    expect(core.getInput).toHaveBeenCalledWith('days-inactive-issues')
+    expect(core.getInput).toHaveBeenCalledWith('days-inactive-prs')
+    expect(core.getInput).toHaveBeenCalledWith('lock-reason-issues')
+    expect(core.getInput).toHaveBeenCalledWith('lock-reason-prs')
 
     // Ensure getInput is called 6 times
-    expect(mockCore.getInput).toHaveBeenCalledTimes(6)
+    expect(core.getInput).toHaveBeenCalledTimes(6)
   })
 })
