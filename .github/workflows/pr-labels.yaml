@@ -5,6 +5,12 @@ name: PR Labels
 on:
   pull_request_target:
     types: [opened, labeled, unlabeled, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to validate
+        required: true
+        type: number
 
 jobs:
   validate:
@@ -14,6 +20,8 @@ jobs:
       - name: 🏷 Verify PR has a valid label
         uses: klaasnicolaas/action-pr-labels@v3.1.1
         with:
+          pr-number: >-
+            ${{ github.event.pull_request.number || inputs.pr_number }}
           valid-labels: >-
             breaking-change, bugfix, documentation, enhancement, sync,
             refactor, performance, new-feature, maintenance, ci, dependencies
