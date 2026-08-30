@@ -1,18 +1,42 @@
-## 🔒 Inactivity Lock
+<p align="center">
+  <picture>
+    <img alt="Inactivity Lock" src=".github/assets/icon.svg" width="96">
+  </picture>
+</p>
 
-[![GitHub Release][releases-shield]][releases]
-![Project Stage][project-stage-shield]
-![Project Maintenance][maintenance-shield]
-[![License][license-shield]](LICENSE)
+<p align="center">
+  <strong>Automatically lock stale issues and pull requests after a configurable period.</strong>
+</p>
 
-[![Test Status][test-shield]][test-url]
-[![Code Coverage][codecov-shield]][codecov-url]
+<p align="center">
+  <a href="https://github.com/klaasnicolaas/action-inactivity-lock/actions/workflows/tests.yaml"><img src="https://github.com/klaasnicolaas/action-inactivity-lock/actions/workflows/tests.yaml/badge.svg" alt="Tests"></a>
+  <a href="https://codecov.io/gh/klaasnicolaas/action-inactivity-lock"><img src="https://codecov.io/gh/klaasnicolaas/action-inactivity-lock/branch/main/graph/badge.svg?token=FJXBX4ZTI1" alt="Coverage"></a>
+  <a href="https://github.com/klaasnicolaas/action-inactivity-lock/releases"><img src="https://img.shields.io/github/v/release/klaasnicolaas/action-inactivity-lock" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/klaasnicolaas/action-inactivity-lock" alt="License"></a>
+</p>
 
-This GitHub action is useful for repositories that want to lock issues and pull requests after a certain period of inactivity, to keep the repository clean and organized.
+<p align="center">
+  <a href="https://github.com/klaasnicolaas/action-inactivity-lock/releases/latest"><strong>Latest release</strong></a>
+  &middot;
+  <a href="#example-workflow"><strong>Usage</strong></a>
+  &middot;
+  <a href="#inputs"><strong>Inputs</strong></a>
+  &middot;
+  <a href="CONTRIBUTING.md"><strong>Contributing</strong></a>
+</p>
 
-For fetching the issues and pull requests, the action uses the [GraphQL API](https://docs.github.com/en/graphql/overview). Instead of a REST API search call, which is very limited in the number of API calls, with the result that you can quickly encounter a [secondary ratelimit](https://docs.github.com/en/rest/search/search?apiVersion=2022-11-28#rate-limit) error.
+<p align="center">
+  Keep repositories tidy with scheduled, rate-limit-aware maintenance and separate inactivity rules for issues and pull requests.
+</p>
 
-### Features
+# Inactivity Lock
+
+Lock closed issues and pull requests after a configurable period of inactivity.
+The action uses GitHub's [GraphQL API](https://docs.github.com/en/graphql/overview)
+to fetch conversations efficiently and maintains a configurable rate-limit
+buffer while processing them.
+
+## Features
 
 - **Lock Issues & Pull Requests**: Locks issues and pull requests after a certain period of inactivity.
 - **Custom Lock Reasons**: Set custom lock reasons for issues and pull requests.
@@ -162,14 +186,3 @@ Thank you for being involved! :heart_eyes:
 ## License
 
 Distributed under the **Apache License 2.0** license. See [`LICENSE`](LICENSE) for more information.
-
-<!-- LINKS -->
-[codecov-shield]: https://codecov.io/gh/klaasnicolaas/action-inactivity-lock/branch/main/graph/badge.svg?token=FJXBX4ZTI1
-[codecov-url]: https://codecov.io/gh/klaasnicolaas/action-inactivity-lock
-[license-shield]: https://img.shields.io/github/license/klaasnicolaas/action-inactivity-lock.svg
-[maintenance-shield]: https://img.shields.io/maintenance/yes/2026.svg
-[project-stage-shield]: https://img.shields.io/badge/project%20stage-production%20ready-brightgreen.svg
-[releases-shield]: https://img.shields.io/github/release/klaasnicolaas/action-inactivity-lock.svg
-[releases]: https://github.com/klaasnicolaas/action-inactivity-lock/releases
-[test-shield]: https://github.com/klaasnicolaas/action-inactivity-lock/actions/workflows/tests.yaml/badge.svg
-[test-url]: https://github.com/klaasnicolaas/action-inactivity-lock/actions/workflows/tests.yaml
