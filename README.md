@@ -1,6 +1,6 @@
 <p align="center">
   <picture>
-    <img alt="Inactivity Lock" src="https://raw.githubusercontent.com/klaasnicolaas/action-inactivity-lock/main/.github/assets/icon.svg" width="96">
+    <img alt="Inactivity Lock" src=".github/assets/icon.svg" width="96">
   </picture>
 </p>
 
